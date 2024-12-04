@@ -54,7 +54,6 @@ def is_in_sites(zap,url):
         if url not in sites:
            zap.core.access_url(url)
            time.sleep(1)
-           is_in_sites(zap,url)
         else:
             pass
             logging.info("Url in Sites")
@@ -145,7 +144,7 @@ def parsear_message(respuesta):
 if __name__ == "__main__":
     load_env()
     client_openai = openai_client()
-    comando = input("Escribe una instruccion: (ejemplo: 'Escanea http://example.com con intensidad baja): ")
+    comando = input("Escribe una instruccion: (ejemplo: 'Escanea http://example.com con intensidad low): ")
     response = interact_with_chatgpt(client_openai, comando)
 
     url, intensidad = parsear_message(response)
