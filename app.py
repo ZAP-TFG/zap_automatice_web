@@ -2,11 +2,19 @@ from flask import Flask, render_template, request
 from forms import *
 from scanner import *
 import os
+from extensions import *
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(32)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zap_data_base.db' 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 
-@app.route('/', methods=['GET', 'POST'])
+#Iniciamos SQLAlchemy
+db.init_app(app)
+
+from models import *
+
+@app.route('/scan', methods=['GET', 'POST'])
 def home():
     form = ScanForm()
     if form.validate_on_submit():

@@ -2,3 +2,4 @@
 .env
 __pycache__/
 zap_logs.log
+/instance
