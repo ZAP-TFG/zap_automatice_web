@@ -12,10 +12,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 #Iniciamos SQLAlchemy
 db.init_app(app)
-
+migrate = Migrate(app,db)
 from models import *
 
-migrate = Migrate(app,db)
+
 
 @app.route('/')
 @app.route('/home', methods=['GET', 'POST'])
@@ -32,6 +32,6 @@ def home():
 @app.route('/scan', methods=['GET', 'POST'])
 def scan():
     return render_template('scan.html')
-
+    
 if __name__ == '__main__':
     app.run(debug=True)
