@@ -1,87 +1,99 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Escáner de Vulnerabilidades</title>
-    <!-- Cargar Bootstrap desde CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #545658;
-            padding-top: 20px;
-        }
-        .container {
-            max-width: 600px;
-        }
-        .card {
-            border-radius: 10px;
-        }
-        .card-header {
-            background-color: #007bff;
-            color: white;
-            font-size: 1.5rem;
-            border-radius: 10px 10px 0 0;
-        }
-        .form-control, .btn {
-            border-radius: 5px;
-        }
-    </style>
-</head>
-<body>
+{% extends 'base.html' %}
 
-<div class="container">
-    <div class="card">
-        <div class="card-header text-center">
-            Escáner de Vulnerabilidades
+{% block content %}
+<div class="row my-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Scans Completed</h5>
+                <p class="card-text">150</p>
+                <a href="#" class="btn btn-light">View Details</a>
+            </div>
         </div>
-        <div class="card-body">
-            <!-- Formulario de Flask-WTF -->
-            <form method="POST">
-                {{ form.hidden_tag() }}  <!-- Para manejar el CSRF token -->
-
-                <!-- Campo de URL -->
-                <div class="mb-3">
-                    <label for="url" class="form-label">URL</label>
-                        {{ form.url(class="form-control", placeholder="Introduce la URL", value=form.url.data) }}
-                        {% if form.url.errors %}
-                            <div class="alert alert-danger mt-2">
-                                <ul>
-                                    {% for error in form.url.errors %}
-                                        <li>{{ error }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        {% endif %}
-                </div>
-
-                <!-- Campo de Intensidad -->
-                <div class="mb-3">
-                    <label for="strength" class="form-label">Strength</label>
-                    {{ form.strength(class="form-select") }}
-                    {% if form.strength.errors %}
-                        <div class="alert alert-danger mt-2">
-                            <ul>
-                                {% for error in form.strength.errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Botón de Enviar -->
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary">{{ form.submit.label }}</button>
-                </div>
-            </form>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <h5 class="card-title">Warnings</h5>
+                <p class="card-text">23</p>
+                <a href="#" class="btn btn-light">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">Resolved</h5>
+                <p class="card-text">120</p>
+                <a href="#" class="btn btn-light">View Details</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <h5 class="card-title">Critical Issues</h5>
+                <p class="card-text">5</p>
+                <a href="#" class="btn btn-light">View Details</a>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Cargar JavaScript de Bootstrap (para el funcionamiento de componentes como el dropdown) -->
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Vulnerability Trends</h5>
+                <canvas id="areaChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Issues by Severity</h5>
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
 
-</body>
-</html>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Area Chart Example
+    const areaCtx = document.getElementById('areaChart').getContext('2d');
+    new Chart(areaCtx, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+                label: 'Vulnerabilities Found',
+                data: [100, 200, 150, 300, 250, 400],
+                borderColor: 'rgba(0, 123, 255, 1)',
+                backgroundColor: 'rgba(0, 123, 255, 0.2)',
+            }]
+        },
+        options: {
+            responsive: true,
+        }
+    });
+
+    // Bar Chart Example
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Low', 'Medium', 'High', 'Critical'],
+            datasets: [{
+                label: 'Issues by Severity',
+                data: [50, 40, 30, 10],
+                backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6f42c1']
+            }]
+        },
+        options: {
+            responsive: true,
+        }
+    });
+</script>
+{% endblock %}

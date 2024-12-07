@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Configure Scan</h2>
+    <form id="scanForm">
+        <!-- URL -->
+        <div class="mb-3">
+            <label for="scanUrl" class="form-label">URL to Scan</label>
+            <input type="url" class="form-control" id="scanUrl" placeholder="https://example.com" required>
+        </div>
+
+        <!-- Intensidad (desplegable) -->
+        <div class="mb-3">
+            <label for="scanIntensity" class="form-label">Scan Intensity</label>
+            <select class="form-select" id="scanIntensity" required>
+                <option value="" disabled selected>Select intensity</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="high">Insane</option>
+                <option value="high">Default</option>
+            </select>
+        </div>
+
+        <!-- Programar escaneo -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="scheduleSwitch">
+            <label class="form-check-label" for="scheduleSwitch">Schedule Scan</label>
+        </div>
+
+        <!-- Calendario dinámico (oculto inicialmente) -->
+        <div id="scheduleFields" class="d-none">
+            <div class="mb-3">
+                <label for="scanDateTime" class="form-label">Pick Date and Time</label>
+                <input type="datetime-local" class="form-control" id="scanDateTime">
+            </div>
+        </div>
+
+        <!-- Scan para una API -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="apiSwitch">
+            <label class="form-check-label" for="apiSwitch">Scan for an API</label>
+        </div>
+
+        <!-- Opciones de API dinámicas (oculto inicialmente) -->
+        <div id="apiFields" class="d-none">
+            <div class="mb-3">
+                <label for="configFile" class="form-label">Upload API File</label>
+                <input type="file" class="form-control" id="configFile">
+            </div>
+        </div>
+
+        <!-- Botón de envío -->
+        <button type="submit" class="btn btn-primary">Start Scan</button>
+    </form>
+</div>
+
+<!-- Importar el archivo JS -->
+<script src="/static/js/scan.js"></script>
+{% endblock %}

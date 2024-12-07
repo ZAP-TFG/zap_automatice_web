@@ -1,0 +1,35 @@
+/* General Styles */
+body {
+    background-color: #121212; /* Fondo oscuro */
+    color: #e0e0e0; /* Texto claro */
+}
+
+.navbar {
+    background-color: #1e1e1e;
+}
+
+.navbar .nav-link, .navbar .navbar-brand {
+    color: #e0e0e0;
+}
+
+.navbar .nav-link:hover {
+    color: #ffffff;
+}
+
+/* Cards */
+.card {
+    background-color: #1e1e1e; /* Fondo oscuro para las tarjetas */
+    color: #e0e0e0;
+    border: none;
+}
+
+/* Buttons */
+.btn-light {
+    background-color: #e0e0e0;
+    color: #121212;
+}
+
+.btn-light:hover {
+    background-color: #d4d4d4;
+    color: #121212;
+}
