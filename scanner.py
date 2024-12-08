@@ -30,7 +30,7 @@ def is_in_sites(zap,url):
         if url not in sites:
            zap.core.access_url(url)
            time.sleep(1)
-           is_in_sites(zap,url)
+           #is_in_sites(zap,url)
         else:
             pass
             logging.info("Url in Sites")
@@ -71,18 +71,11 @@ def active_scan(zap,url,strength):
             elif int(zap.ascan.status(scan_id)) == 100:
                 logging.info("Scan Complete -> 100%")
                 break
+        return scan_id
     except Exception as error:
         logging.error(f"Error trying to Scan {url}: {error}")
         exit(1)
 
-# if __name__ == "__main__":
-#     url='http://pruebachatweb.cofares.es'
-#     strength='low'
-#     load_env()
-#     zap = connection_to_zap()
-#     is_in_sites(zap,url)
-#     scan_strength(zap,strength)
-#     active_scan(zap,url,strength)
 
 
 

@@ -10,7 +10,8 @@ class Escaneres_completados(db.Model):
     fecha_inicio = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     fecha_fin = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     intensidad = db.Column(db.String(50), nullable=False, default='DEFAULT')
-    
+    api_scan = db.Column(db.Boolean, default = False)
+    file_path = db.Column(db.String(150),nullable=True)
     # Relación con la tabla Vulnerabilidades
     vulnerabilidades = db.relationship('Vulnerabilidades', backref='escaneo', lazy=True)
 
@@ -32,3 +33,5 @@ class Escaneo_programados(db.Model):
     fecha_programada = db.Column(db.DateTime, nullable=False)
     estado = db.Column(db.String(50), nullable=False, default='PENDIENTE') 
     archivo_subido = db.Column(db.String(200), nullable=True)
+    api_scan = db.Column(db.Boolean, default = False)
+    file_path = db.Column(db.String(150),nullable=True)

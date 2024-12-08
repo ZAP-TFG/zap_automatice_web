@@ -1,4 +1,3 @@
-
 const scheduleSwitch = document.getElementById('scheduleSwitch');
 const scheduleFields = document.getElementById('scheduleFields');
 
@@ -9,7 +8,6 @@ scheduleSwitch.addEventListener('change', () => {
         scheduleFields.classList.add('d-none');
     }
 });
-
 
 const apiSwitch = document.getElementById('apiSwitch');
 const apiFields = document.getElementById('apiFields');
@@ -22,21 +20,50 @@ apiSwitch.addEventListener('change', () => {
     }
 });
 
-
+// Enviar formulario
 document.getElementById('scanForm').addEventListener('submit', (event) => {
     event.preventDefault();
 
-    const data = {
-        url: document.getElementById('scanUrl').value,
-        intensity: document.getElementById('scanIntensity').value,
-        scheduled: scheduleSwitch.checked,
-        dateTime: scheduleSwitch.checked ? document.getElementById('scanDateTime').value : null,
-        apiScan: apiSwitch.checked,
-        file: apiSwitch.checked ? document.getElementById('configFile').files[0] : null,
-    };
+    // Recoger los datos del formulario
+    const url = document.getElementById('scanUrl').value; 
+    const intensity = document.getElementById('scanIntensity').value;
+    const scheduled = scheduleSwitch.checked;  
+    const dateTime = scheduled ? document.getElementById('datetimepicker').value : null;  
+    const apiScan = apiSwitch.checked;  
+    const file = apiSwitch.checked ? document.getElementById('configFile').files[0] : null;  
 
-    console.log('Scan data:', data);
+    // Validación de campos obligatorios
+    if (!url || !intensity) {
+        alert('Por favor, complete todos los campos obligatorios.');
+        return;
+    }
 
-    
-    alert('Scan configuration saved. Ready to start!');
+    const formData = new FormData();
+    formData.append('url', url);
+    formData.append('intensity', intensity);
+    formData.append('scheduled', scheduled);
+    formData.append('dateTime', dateTime);
+    formData.append('apiScan', apiScan);
+
+    if (file) {
+        formData.append('file', file);
+    }
+
+    // Realizamos la petición AJAX
+    fetch('/process_scan', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())  // Parseamos la respuesta a JSON
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);  // Mostramos un mensaje de éxito
+        } else {
+            alert('Error al guardar el escaneo: ' + data.message);  // Mensaje de error del servidor
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hubo un error al procesar el escaneo.');  // Manejo de errores de la red o del servidor
+    });
 });

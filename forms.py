@@ -1,8 +1,18 @@
 from flask_wtf import FlaskForm
-from wtforms.validators import DataRequired, InputRequired, Email
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField
+from wtforms.validators import DataRequired, InputRequired, Email, Optional, ValidationError
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, DateTimeLocalField, FileField
+
 
 class ScanForm(FlaskForm):
-    url = StringField('URL', validators=[DataRequired()])
-    strength = SelectField('Strength', choices=[('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High'), ('INSANE', 'Insane'), ('DEFAULT', 'Default')], validators=[InputRequired()])
+
+    url = StringField('Target URL', validators=[DataRequired()], render_kw={"placeholder": "https://example.com"})
+    strength = SelectField(' Set Strength', choices=[ ('DEFAULT', 'Default'), ('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High'), ('INSANE', 'Insane')], validators=[InputRequired()])
+    schedule = BooleanField('Schedule', default=False)
+    scanDateTime = DateTimeLocalField("Select Date & Time", format='%d/%m/%Y %H:%M', validators=[Optional()], render_kw={"class": "form-control"})
+    apiscan = BooleanField('API Scan', default=False)
+    configFile = FileField('Upload API File', validators=[Optional()])  
     submit = SubmitField('Start Scan')
+
+    def validate_scanDateTime(self, field):
+        if self.schedule.data and not field.data:
+            raise ValidationError('Date and Time is required if you are scheduling the scan.')
