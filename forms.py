@@ -16,3 +16,8 @@ class ScanForm(FlaskForm):
     def validate_scanDateTime(self, field):
         if self.schedule.data and not field.data:
             raise ValidationError('Date and Time is required if you are scheduling the scan.')
+        
+class ChatForm(FlaskForm):
+    message = StringField('User Message', validators=[DataRequired()], render_kw={"placeholder": "Escribe mensage aqui"})
+    submit = SubmitField('Enviar')
+    submit2 = SubmitField('Configuracion')

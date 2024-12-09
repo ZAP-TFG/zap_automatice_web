@@ -6,6 +6,7 @@ import os
 from extensions import *
 from flask_migrate import Migrate
 from datetime import datetime
+from openai import OpenAI
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(32)
@@ -91,6 +92,52 @@ def process_scan():
             return jsonify({'status': 'error', 'message': f'Error durante el escaneo: {error}'}), 500
 
     return jsonify({'status': 'success', 'message': 'Escaneo programado correctamente'}), 200
+
+def openai_client():
+    openai_key = os.getenv('OPENAI_API_KEY')
+    if not openai_key:
+        logging.error("Falta openai_key")
+        exit(1)
+    return OpenAI(api_key=openai_key)
+
+
+@app.route('/chatBot', methods=['GET'])
+def chatbot():
+    form = ChatForm()
+    return render_template("chatbot.html", form=form)
+
+@app.route('/chatget', methods=['POST'])
+def chatget():
+    client = openai_client()
+    user_message = request.json.get('message')
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente experto en vulnerabilidades web"},
+                { "role": "user", "content": user_message}
+            ]
+        )
+        return jsonify({"reply": response.choices[0].message.content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/chatconfig', methods=['POST'])
+def chatconfig():
+    client = openai_client()
+    user_message = request.json.get('message')
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistento al que le van a pasar una configuracion y tu tienes que sacar solo la url, la fecha en formato Datetime y la intesidad, sacamelo en formato JSON"},
+                { "role": "user", "content": user_message}
+            ]
+        )
+        return jsonify({"reply": response.choices[0].message.content})
+    except Exception as e:
+        logging.error("error al comunicarse con la api")
+        exit(1)
 
 if __name__ == '__main__':
     app.run(debug=True)

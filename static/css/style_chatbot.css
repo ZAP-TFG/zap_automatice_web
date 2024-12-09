@@ -1,0 +1,21 @@
+body {
+    font-family: 'Arial', sans-serif;
+}
+
+#chat-container {
+    background: #2c2c2c;
+    border-radius: 5px;
+}
+
+#messages {
+    padding: 10px;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+}
+
+.text-wrap {
+    display: inline-block;
+    max-width: 70%;
+    word-wrap: break-word;
+}

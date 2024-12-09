@@ -29,13 +29,14 @@ def read_file(file_path):
         logging.error(f"Error al leer el archivo: {e}")
         exit(1)
 
-def interact_with_chatgpt(client,prompt):
+def interact_with_chatgpt(client,prompt,prompt2):
     try:
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Eres un asistente experto en el area de ciberseguridad al que le van a pasar un informe y tiene que resumir lo mas importante y sacar las alertas principales y decir como se podria solvetar esta alerta"},
-                { "role": "user", "content": prompt}
+                {"role": "system", "content": "Eres un asistente experto en el area de ciberseguridad al que le van a pasar 2 informes, el archivo que tiene en el nombre el numero 2 es el mas reciente. Necesito que me hagas una comparativa entre el viejo y el nuevo y que alertas se han solventado y saca que porcentaje de alertas han sido solventadas."},
+                { "role": "user", "content": prompt},
+                { "role": "user", "content": prompt2}
             ]
         )
         return response
@@ -47,7 +48,9 @@ def interact_with_chatgpt(client,prompt):
 if __name__== '__main__':
     client = openai_client()
     path_file = "/home/kalilinux22/2024-12-04-ZAP-Report-.json"
-    archivo = read_file(path_file)
-    respuesta = interact_with_chatgpt(client,archivo)
+    path_file2= "/home/kalilinux22/2024-12-04-ZAP-Report-2.json"
+    archivo1 = read_file(path_file)
+    archivo2 = read_file(path_file2)
+    respuesta = interact_with_chatgpt(client,archivo1,archivo2)
     print(respuesta.choices[0].message.content)
 
