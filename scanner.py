@@ -3,6 +3,11 @@ import time
 import logging
 from dotenv import load_dotenv
 import os
+from extensions import *
+from models import *
+import json
+
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,10 +64,53 @@ def scan_strength(zap,strength):
         logging.error(f"Error trying to set scan strength: {error}")
         exit(1)
 
+
+def get_escan(zap, url):
+    try:
+        # Configuración del reporte
+        reportdir = '/tmp'
+        reportfilename = 'Reporte_vulnerabilidades'
+        filepath = os.path.join(reportdir, f"{reportfilename}.json")
+
+        # Generar el reporte
+        zap.reports.generate(
+            title="report_json",
+            template="traditional-json",
+            sites=url,
+            reportdir=reportdir,
+            reportfilename=reportfilename
+        )
+
+        # Verificar que el archivo se haya generado
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"El archivo de reporte no se encontró en la ruta esperada: {filepath}")
+
+        # Leer el contenido del archivo
+        with open(filepath, 'r') as file:
+            report_content = json.load(file)
+
+        # Eliminar el archivo después de leerlo
+        os.remove(filepath)
+
+        return report_content
+
+    except Exception as e:
+        # Manejo de errores
+        logging.error(f"Error al generar o leer el reporte: {str(e)}")
+        return None
+
+
 def active_scan(zap,url,strength):
     scan_strength(zap,strength)
     time.sleep(1)
     try:
+        fecha_ini = datetime.now()
+        escaneo_completado = Escaneres_completados(
+            target_url = url,
+            estado = "En proceso",
+            fecha_inicio = fecha_ini,
+            intensidad = strength
+        )
         scan_id = zap.ascan.scan(url)
         while True:
             if int(zap.ascan.status(scan_id)) < 100:
@@ -71,11 +119,17 @@ def active_scan(zap,url,strength):
             elif int(zap.ascan.status(scan_id)) == 100:
                 logging.info("Scan Complete -> 100%")
                 break
+        report_file = get_escan(zap,url)
+        fecha_fin = datetime.now()
+        escaneo_completado.fecha_fin = fecha_fin
+        escaneo_completado.report_file = report_file
+        escaneo_completado.estado = "COMPLETADO"
+        db.session.add(escaneo_completado)
+        db.session.commit()
         return scan_id
+        
     except Exception as error:
         logging.error(f"Error trying to Scan {url}: {error}")
         exit(1)
-
-
-
+    
 

@@ -46,24 +46,37 @@ document.getElementById('scanForm').addEventListener('submit', (event) => {
     formData.append('apiScan', apiScan);
 
     if (file) {
-        formData.append('file', file);
-    }
+        // Leer el archivo JSON como texto
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const jsonContent = JSON.parse(event.target.result);  // Parseamos el contenido del archivo JSON
+            formData.append('file', JSON.stringify(jsonContent));  // Enviamos el contenido como un string JSON
 
-    // Realizamos la petición AJAX
+            // Ahora que el archivo está procesado, enviamos el formulario
+            enviarFormulario(formData);
+        };
+        reader.readAsText(file);  // Leemos el archivo como texto
+    } else {
+        enviarFormulario(formData);
+    }
+});
+
+// Función para enviar los datos con fetch
+function enviarFormulario(formData) {
     fetch('/process_scan', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())  // Parseamos la respuesta a JSON
+    .then(response => response.json())  
     .then(data => {
         if (data.status === 'success') {
-            alert(data.message);  // Mostramos un mensaje de éxito
+            alert(data.message);  
         } else {
-            alert('Error al guardar el escaneo: ' + data.message);  // Mensaje de error del servidor
+            alert('Error al guardar el escaneo: ' + data.message);  
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Hubo un error al procesar el escaneo.');  // Manejo de errores de la red o del servidor
+        alert('Hubo un error al procesar el escaneo.');  
     });
-});
+}

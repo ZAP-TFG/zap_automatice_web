@@ -1,5 +1,6 @@
-from extensions import db
+from extensions import *
 from datetime import datetime, timezone
+
 
 class Escaneres_completados(db.Model):
     __tablename__ = 'escaneos_completados'  
@@ -11,7 +12,8 @@ class Escaneres_completados(db.Model):
     fecha_fin = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     intensidad = db.Column(db.String(50), nullable=False, default='DEFAULT')
     api_scan = db.Column(db.Boolean, default = False)
-    file_path = db.Column(db.String(150),nullable=True)
+    api_file = db.Column(JSON,nullable=True)
+    report_file = db.Column(JSON, nullable=True) # recoger alertas que umbral medio/alto
     # Relación con la tabla Vulnerabilidades
     vulnerabilidades = db.relationship('Vulnerabilidades', backref='escaneo', lazy=True)
 
@@ -34,4 +36,4 @@ class Escaneo_programados(db.Model):
     estado = db.Column(db.String(50), nullable=False, default='PENDIENTE') 
     archivo_subido = db.Column(db.String(200), nullable=True)
     api_scan = db.Column(db.Boolean, default = False)
-    file_path = db.Column(db.String(150),nullable=True)
+    api_file = db.Column(JSON,nullable=True)
