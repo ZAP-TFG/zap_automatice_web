@@ -4,8 +4,8 @@ import logging
 from dotenv import load_dotenv
 import os
 
-def load_env():
-    load_dotenv()
+#def load_env():
+load_dotenv()
 
 def connection_to_zap():
     try:
@@ -19,9 +19,11 @@ def connection_to_zap():
 url = 'http://example.com'
 nombre = 'gabri'
 zap = connection_to_zap()
-report_json = zap.reports.generate(
-    title=nombre,
-    template='traditional-json',
-    sites=url
-)
-print(report_json)
+# zap.core.new_session(name="sesion_unica", overwrite=True)
+# time.sleep(2)
+# zap.core.access_url(url)
+# time.sleep(1)
+# scan_id = zap.ascan.scan(url)
+alerts = zap.alert.alerts_by_risk(url=url)
+alerts_high = alerts.get('Informational')
+print(alerts_high)

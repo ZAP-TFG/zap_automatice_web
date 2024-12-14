@@ -6,7 +6,7 @@
         <div class="card bg-primary text-white">
             <div class="card-body">
                 <h5 class="card-title">Scans Completed</h5>
-                <p class="card-text">150</p>
+                <p class="card-text">{{data.scans_completed}}</p>
                 <a href="#" class="btn btn-light">View Details</a>
             </div>
         </div>
@@ -15,7 +15,7 @@
         <div class="card bg-warning text-white">
             <div class="card-body">
                 <h5 class="card-title">Warnings</h5>
-                <p class="card-text">23</p>
+                <p class="card-text">{{data.total_vulnerabilities}}</p>
                 <a href="#" class="btn btn-light">View Details</a>
             </div>
         </div>
@@ -84,10 +84,10 @@
     new Chart(barCtx, {
         type: 'bar',
         data: {
-            labels: ['Low', 'Medium', 'High', 'Critical'],
+            labels: {{data.chart_data.labels | tojson}},
             datasets: [{
                 label: 'Issues by Severity',
-                data: [50, 40, 30, 10],
+                data: {{ data.chart_data.data | tojson }},
                 backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6f42c1']
             }]
         },

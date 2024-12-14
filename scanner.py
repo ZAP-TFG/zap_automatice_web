@@ -65,14 +65,11 @@ def scan_strength(zap,strength):
         exit(1)
 
 
-def get_escan(zap, url):
+def get_report(zap, url):
     try:
-        # Configuración del reporte
         reportdir = '/tmp'
         reportfilename = 'Reporte_vulnerabilidades'
         filepath = os.path.join(reportdir, f"{reportfilename}.json")
-
-        # Generar el reporte
         zap.reports.generate(
             title="report_json",
             template="traditional-json",
@@ -80,24 +77,80 @@ def get_escan(zap, url):
             reportdir=reportdir,
             reportfilename=reportfilename
         )
-
-        # Verificar que el archivo se haya generado
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"El archivo de reporte no se encontró en la ruta esperada: {filepath}")
-
-        # Leer el contenido del archivo
         with open(filepath, 'r') as file:
             report_content = json.load(file)
-
-        # Eliminar el archivo después de leerlo
         os.remove(filepath)
-
         return report_content
 
     except Exception as e:
-        # Manejo de errores
         logging.error(f"Error al generar o leer el reporte: {str(e)}")
         return None
+
+def get_total_vulnerabilities(high, medium, low, info):
+    try: 
+        vulne_totales = Vulnerabilidades_totales.query.first()
+        if vulne_totales:
+            vulne_totales.escaneos_totales += 1
+            vulne_totales.vul_all_totales += high + medium + low + info
+            vulne_totales.vul_tot_altas += high                    
+            vulne_totales.vul_tot_medias += medium            
+            vulne_totales.vul_tot_bajas += low                     
+            vulne_totales.vul_tot_info += info     
+        else:
+            vulnerabilidades_totales = Vulnerabilidades_totales(
+                escaneos_totales = 1,
+                vul_all_totales = high + medium + low + info,
+                vul_tot_altas = high,
+                vul_tot_medias = medium,
+                vul_tot_bajas =low,
+                vul_tot_info = info
+            )
+            db.session.add(vulnerabilidades_totales)
+
+        db.session.commit()
+
+    except Exception as e:
+        logging.error(f"Error al actualizar los totales de vulnerabilidades: {e}")
+        
+
+def get_vulnerabilities(zap,url,fecha_fin):
+    st = 0
+    max = 500
+    alerts_high = set()
+    alerts_medium = set()
+    alerts_low = set()
+    alerts_info = set()
+    try:
+        alerts = zap.alert.alerts(baseurl = url, start = st, count=max)
+        for alert in alerts:
+            alert_risk = alert.get('risk')
+            alert_name = alert.get('name')
+            if alert_risk == 'High':
+                alerts_high.add(f"{alert_name}")
+            elif alert_risk == 'Medium':
+                alerts_medium.add(f"{alert_name}")
+            elif alert_risk == 'Low':
+                alerts_low.add(f"{alert_name}")
+            else:
+                alerts_info.add(f"{alert_name}")
+        report = get_report(zap,url)
+        time.sleep(2)
+        reportes_vulnnerabilidades = Reportes_vulnerabilidades_url(
+            vul_altas = len(alerts_high),
+            vul_medias = len(alerts_medium),
+            vul_bajas = len(alerts_low),
+            vul_info = len(alerts_info),
+            fecha_scan = fecha_fin,
+            report_file = report
+        )
+        db.session.add(reportes_vulnnerabilidades)
+        db.session.commit()
+        get_total_vulnerabilities(len(alerts_high), len(alerts_medium),len(alerts_low),len(alerts_info))
+
+    except Exception as e:
+        logging.error(f"Error al tratar de genererar vulenrabilidades: {e}")
 
 
 def active_scan(zap,url,strength):
@@ -111,6 +164,8 @@ def active_scan(zap,url,strength):
             fecha_inicio = fecha_ini,
             intensidad = strength
         )
+        #zap.core.new_session(name="sesion_unica", overwrite=True)
+        time.sleep(2) ############################################################3
         scan_id = zap.ascan.scan(url)
         while True:
             if int(zap.ascan.status(scan_id)) < 100:
@@ -119,13 +174,14 @@ def active_scan(zap,url,strength):
             elif int(zap.ascan.status(scan_id)) == 100:
                 logging.info("Scan Complete -> 100%")
                 break
-        report_file = get_escan(zap,url)
+        report_file = get_report(zap,url)
         fecha_fin = datetime.now()
         escaneo_completado.fecha_fin = fecha_fin
         escaneo_completado.report_file = report_file
         escaneo_completado.estado = "COMPLETADO"
         db.session.add(escaneo_completado)
         db.session.commit()
+        get_vulnerabilities(zap,url,fecha_fin)
         return scan_id
         
     except Exception as error:

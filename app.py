@@ -25,7 +25,21 @@ from models import *  # Importamos los modelos
 @app.route('/')
 @app.route('/home', methods=['GET', 'POST'])
 def home():
-    return render_template('index.html')
+    vul_totales = Vulnerabilidades_totales.query.first()
+    data = {
+        "scans_completed": vul_totales.escaneos_totales if vul_totales else 0,
+        "total_vulnerabilities": vul_totales.vul_all_totales if vul_totales else 0,
+        "chart_data" : {
+            "labels" : ["Info","Low", "Medium", "High"],
+            "data": [
+                vul_totales.vul_tot_info if vul_totales else 0,
+                vul_totales.vul_tot_bajas if vul_totales else 0,
+                vul_totales.vul_tot_medias if vul_totales else 0,
+                vul_totales.vul_tot_altas if vul_totales else 0,
+            ]
+        }
+    }
+    return render_template('index.html', data=data)
 
 @app.route('/scan', methods=['GET', 'POST'])
 def scan():
@@ -74,8 +88,7 @@ def process_scan():
             db.session.commit()
         except ValueError:
             return jsonify({'status': 'error', 'message': 'Formato de fecha y hora inválido.'}), 400
-
-    
+        
     if configFile:
         try:
             configFile = json.loads(configFile)
