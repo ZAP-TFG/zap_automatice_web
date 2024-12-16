@@ -138,6 +138,7 @@ def get_vulnerabilities(zap,url,fecha_fin):
         report = get_report(zap,url)
         time.sleep(2)
         reportes_vulnnerabilidades = Reportes_vulnerabilidades_url(
+            target_url = url,
             vul_altas = len(alerts_high),
             vul_medias = len(alerts_medium),
             vul_bajas = len(alerts_low),

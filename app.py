@@ -8,6 +8,10 @@ from flask_migrate import Migrate
 from datetime import datetime
 from openai import OpenAI
 import json
+from sqlalchemy.inspection import inspect
+from sqlalchemy import text
+import logging
+from schedule_scans import *
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(32)
@@ -21,7 +25,9 @@ db.init_app(app)
 migrate = Migrate(app, db)
 from models import *  # Importamos los modelos
 
-
+def init_sheduler_scans():
+    init_scheduler()
+    
 @app.route('/')
 @app.route('/home', methods=['GET', 'POST'])
 def home():
@@ -46,6 +52,10 @@ def scan():
     form = ScanForm() 
     return render_template('scan.html', form=form)
 
+@app.route('/reports', methods=['GET', 'POST'])
+def chat_vul():
+    form = ChatForm()
+    return render_template('vulnerabilities.html', form=form)
 
 def allowed_file(filename):
     """Verifica si el archivo tiene una extensión permitida"""
@@ -153,5 +163,101 @@ def chatconfig():
         logging.error("error al comunicarse con la api")
         exit(1)
 
+@app.route('/api/vulnerabilidaes', methods=['POST'])
+def chat_sql():
+    client = openai_client()
+    user_message = request.json.get('message')
+    inspector = inspect(db.engine)
+    columnas = inspector.get_columns("reportes_vulnerabilidades_url")
+
+    try:
+        # Interactuar con OpenAI para obtener la consulta SQL
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente especializado en consultas SQL al que le voy a pasar la informacion de la tabla de la bbdd para que pueda realizar su consulta saviendo que la tabla se llama reportes_vulnerabilidades_url. Las vulnerabilidades se encuentran en el report_file. Solo quiero la consulta, no quiero explicaiones ni que pongas ```sql "},
+                {"role": "system", "content": f"{columnas}"},
+                {"role": "user", "content": user_message}
+            ]
+        )
+        # Validar la respuesta de OpenAI
+        if not response or not response.choices or not response.choices[0].message.content:
+            raise ValueError("Respuesta inválida o incompleta de OpenAI")
+        
+        sql_query = response.choices[0].message.content
+        if not sql_query.lower().startswith("select"):
+            raise ValueError(f"Consulta SQL inválida: {sql_query}")
+
+        # Ejecutar la consulta SQL
+        query = text(sql_query)
+        try:
+            resultados = db.session.execute(query).fetchall()
+        except Exception as e:
+            logging.error(f"Error al ejecutar la consulta SQL: {e}")
+            return jsonify({"error": "Error en la consulta SQL.", "details": str(e)}), 400
+
+        # Procesar resultados
+        try:
+            report_file = [json.loads(fila[0]) for fila in resultados]
+        except json.JSONDecodeError as e:
+            logging.error(f"Error al decodificar JSON: {e}")
+            return jsonify({"error": "Error al procesar resultados.", "details": str(e)}), 500
+
+        json_file = json.dumps(report_file, indent=4)
+        response2 = chat_resum_vul(client, json_file)
+
+        # Continuar con el resto de la lógica
+        url = None
+        for fila in report_file:
+            if 'site' in fila:
+                for site in fila['site']:
+                    if '@name' in site:
+                        url = site['@name']
+            if url:
+                break
+
+        vul_urls = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(len(json_file)).all()
+        data = {
+            "chart_data": {
+                "labels": ["Info", "Low", "Medium", "High"],
+                "data_first_row": [
+                    vul_urls[0].vul_altas if len(vul_urls) > 0 else 0,
+                    vul_urls[0].vul_medias if len(vul_urls) > 0 else 0,
+                    vul_urls[0].vul_bajas if len(vul_urls) > 0 else 0,
+                    vul_urls[0].vul_info if len(vul_urls) > 0 else 0,
+                ],
+                "data_second_row": [
+                    vul_urls[1].vul_altas if len(vul_urls) > 1 else 0,
+                    vul_urls[1].vul_medias if len(vul_urls) > 1 else 0,
+                    vul_urls[1].vul_bajas if len(vul_urls) > 1 else 0,
+                    vul_urls[1].vul_info if len(vul_urls) > 1 else 0,
+                ]
+            }
+        }
+        return jsonify({"reply": response2, "chart_data": data})
+
+    except Exception as e:
+        logging.error(f"Error al comunicarse con la API: {e}")
+        return jsonify({"error": "Ocurrió un error en el servidor.", "details": str(e)}), 500
+
+
+def chat_resum_vul(client, bbdd_data):
+    try:
+
+        completion = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB al que le van a pasar uno o dos reportes y lo mas resumido posible sacar las diferencias y vulnerabilidades de cada uno"},
+                {
+                    "role": "user",
+                    "content": bbdd_data
+                }
+            ]
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        logging.error(f"Error al interactuar con el LLM")
+
 if __name__ == '__main__':
+    init_sheduler_scans()
     app.run(debug=True)

@@ -28,9 +28,10 @@ class Vulnerabilidades_totales(db.Model):
     vul_all_totales =  db.Column(db.Integer, default=0, nullable=False)
 
 class Reportes_vulnerabilidades_url(db.Model):
-    __tablename__ = 'reportes_vulnerabildiades_url'  
+    __tablename__ = 'reportes_vulnerabilidades_url'  
     
     id =  id = db.Column(db.Integer, primary_key=True)
+    target_url = db.Column(db.String(200), nullable=False)
     vul_altas = db.Column(db.Integer, default=0, nullable=False)
     vul_medias = db.Column(db.Integer, default=0, nullable=False)
     vul_bajas = db.Column(db.Integer, default=0, nullable=False)

@@ -4,3 +4,6 @@ __pycache__/
 zap_logs.log
 /instance
 /migrations
+/instance
+jobs.db
+zap_data_base.db
