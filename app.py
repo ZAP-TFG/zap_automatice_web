@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+# from flask import Flask, render_template, request, jsonify
 from forms import *
 from scanner import connection_to_zap,is_in_sites,active_scan
 from werkzeug.utils import secure_filename
@@ -13,7 +13,7 @@ from sqlalchemy import text
 import logging
 from schedule_scans import *
 
-app = Flask(__name__)
+# app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(32)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zap_data_base.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
@@ -27,7 +27,7 @@ from models import *  # Importamos los modelos
 
 def init_sheduler_scans():
     init_scheduler()
-    
+
 @app.route('/')
 @app.route('/home', methods=['GET', 'POST'])
 def home():
@@ -247,7 +247,7 @@ def chat_resum_vul(client, bbdd_data):
         completion = client.chat.completions.create(
             model="gpt-4-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB al que le van a pasar uno o dos reportes y lo mas resumido posible sacar las diferencias y vulnerabilidades de cada uno"},
+                {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB al que le van a pasar uno o dos reportes y lo mas resumido posible sacar las diferencias. Bien estructurado y que sea corto"},
                 {
                     "role": "user",
                     "content": bbdd_data
