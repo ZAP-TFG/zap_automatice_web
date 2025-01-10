@@ -157,6 +157,7 @@ with app.app_context():
 
     if contexto == "configuracion":
         try:
+            pdb.set_trace()
             time.sleep(0.5)
             respuesta_config = interact_with_gpt_config(client,message)
             print(respuesta_config)
@@ -175,11 +176,13 @@ with app.app_context():
             print(consulta_bbdd)
 
             pdb.set_trace()
+
             report_file = [json.loads(fila[0]) for fila in consulta_bbdd]
             json_file = json.dumps(report_file, indent=4)
             print(json_file)
 
             pdb.set_trace()
+
             time.sleep(0.5)
             respuesta_compare_reports = interact_with_gpt_compare_reports(client,json_file)
             print(respuesta_compare_reports)
@@ -188,34 +191,11 @@ with app.app_context():
     elif contexto == "vulnerabilidades":
         try: 
             pdb.set_trace()
+
+
             time.sleep(0.5)
             query_vul = text(interact_with_gpt_sql_vulnerabilidades(client, message, columnas))
             print(query_vul)
         except Exception as e:
             logging.error(f"Error 5:{e}")
 
-    # respuesta = interact_with_gpt(client,pregunta, columnas)
-    # print(respuesta)
-
-    # query = text(respuesta)
-    # resultados = db.session.execute(query).fetchall()
-    # print(resultados)
-
-    # report_file = [json.loads(fila[0]) for fila in resultados]
-    # json_file = json.dumps(report_file, indent=4)
-    # print(json_file)
-    # url = set()
-    # for fila in report_file:
-    #     if 'site' in fila:
-    #         for site in fila['site']:
-    #             if '@name' in site:
-    #                 url = site['@name']
-    #                 break
-#     print(url)
-#     vul_urls = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(len(json_file)).all()
-#     for vul in vul_urls:
-#         print(vul.target_url, vul.fecha_scan, vul.vul_altas, vul.vul_medias, vul.vul_bajas, vul.vul_info)
-# pregunta = input("Escribe pregunta: ")
-# respuesta2 = interact_with_gpt_context(client, pregunta)
-# print(respuesta2)
-    

@@ -50,3 +50,4 @@ class Escaneo_programados(db.Model):
     archivo_subido = db.Column(db.String(200), nullable=True)
     api_scan = db.Column(db.Boolean, default = False)
     api_file = db.Column(JSON,nullable=True)
+    periodicidad_dias = db.Column(db.Integer, default = 0)

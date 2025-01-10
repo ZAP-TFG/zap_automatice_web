@@ -10,7 +10,7 @@ class ScanForm(FlaskForm):
     schedule = BooleanField('Schedule', default=False)
     scanDateTime = DateTimeLocalField("Select Date & Time", format='%d/%m/%Y %H:%M', validators=[Optional()], render_kw={"class": "form-control"})
     apiscan = BooleanField('API Scan', default=False)
-    configFile = FileField('Upload API File')  
+    configFile = FileField('Upload API File', validators=[Optional()])  
     submit = SubmitField('Start Scan')
 
     def validate_scanDateTime(self, field):

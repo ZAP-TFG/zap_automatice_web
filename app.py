@@ -180,7 +180,7 @@ def chat_sql():
                 {"role": "user", "content": user_message}
             ]
         )
-        # Validar la respuesta de OpenAI
+        
         if not response or not response.choices or not response.choices[0].message.content:
             raise ValueError("Respuesta inválida o incompleta de OpenAI")
         
@@ -188,7 +188,7 @@ def chat_sql():
         if not sql_query.lower().startswith("select"):
             raise ValueError(f"Consulta SQL inválida: {sql_query}")
 
-        # Ejecutar la consulta SQL
+        
         query = text(sql_query)
         try:
             resultados = db.session.execute(query).fetchall()
@@ -196,7 +196,7 @@ def chat_sql():
             logging.error(f"Error al ejecutar la consulta SQL: {e}")
             return jsonify({"error": "Error en la consulta SQL.", "details": str(e)}), 400
 
-        # Procesar resultados
+        
         try:
             report_file = [json.loads(fila[0]) for fila in resultados]
         except json.JSONDecodeError as e:
@@ -207,34 +207,34 @@ def chat_sql():
         response2 = chat_resum_vul(client, json_file)
 
         # Continuar con el resto de la lógica
-        url = None
-        for fila in report_file:
-            if 'site' in fila:
-                for site in fila['site']:
-                    if '@name' in site:
-                        url = site['@name']
-            if url:
-                break
+        # url = None
+        # for fila in report_file:
+        #     if 'site' in fila:
+        #         for site in fila['site']:
+        #             if '@name' in site:
+        #                 url = site['@name']
+        #     if url:
+        #         break
 
-        vul_urls = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(len(json_file)).all()
-        data = {
-            "chart_data": {
-                "labels": ["Info", "Low", "Medium", "High"],
-                "data_first_row": [
-                    vul_urls[0].vul_altas if len(vul_urls) > 0 else 0,
-                    vul_urls[0].vul_medias if len(vul_urls) > 0 else 0,
-                    vul_urls[0].vul_bajas if len(vul_urls) > 0 else 0,
-                    vul_urls[0].vul_info if len(vul_urls) > 0 else 0,
-                ],
-                "data_second_row": [
-                    vul_urls[1].vul_altas if len(vul_urls) > 1 else 0,
-                    vul_urls[1].vul_medias if len(vul_urls) > 1 else 0,
-                    vul_urls[1].vul_bajas if len(vul_urls) > 1 else 0,
-                    vul_urls[1].vul_info if len(vul_urls) > 1 else 0,
-                ]
-            }
-        }
-        return jsonify({"reply": response2, "chart_data": data})
+        # vul_urls = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(len(json_file)).all()
+        # data = {
+        #     "chart_data": {
+        #         "labels": ["Info", "Low", "Medium", "High"],
+        #         "data_first_row": [
+        #             vul_urls[0].vul_altas if len(vul_urls) > 0 else 0,
+        #             vul_urls[0].vul_medias if len(vul_urls) > 0 else 0,
+        #             vul_urls[0].vul_bajas if len(vul_urls) > 0 else 0,
+        #             vul_urls[0].vul_info if len(vul_urls) > 0 else 0,
+        #         ],
+        #         "data_second_row": [
+        #             vul_urls[1].vul_altas if len(vul_urls) > 1 else 0,
+        #             vul_urls[1].vul_medias if len(vul_urls) > 1 else 0,
+        #             vul_urls[1].vul_bajas if len(vul_urls) > 1 else 0,
+        #             vul_urls[1].vul_info if len(vul_urls) > 1 else 0,
+        #         ]
+        #     }
+        # }
+        return jsonify({"reply": response2})
 
     except Exception as e:
         logging.error(f"Error al comunicarse con la API: {e}")

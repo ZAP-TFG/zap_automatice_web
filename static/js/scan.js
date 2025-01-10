@@ -20,11 +20,11 @@ apiSwitch.addEventListener('change', () => {
     }
 });
 
-// Enviar formulario
+
 document.getElementById('scanForm').addEventListener('submit', (event) => {
     event.preventDefault();
 
-    // Recoger los datos del formulario
+ 
     const url = document.getElementById('scanUrl').value; 
     const intensity = document.getElementById('scanIntensity').value;
     const scheduled = scheduleSwitch.checked;  
@@ -32,7 +32,7 @@ document.getElementById('scanForm').addEventListener('submit', (event) => {
     const apiScan = apiSwitch.checked;  
     const file = apiSwitch.checked ? document.getElementById('configFile').files[0] : null;  
 
-    // Validación de campos obligatorios
+
     if (!url || !intensity) {
         alert('Por favor, complete todos los campos obligatorios.');
         return;
@@ -46,13 +46,10 @@ document.getElementById('scanForm').addEventListener('submit', (event) => {
     formData.append('apiScan', apiScan);
 
     if (file) {
-        // Leer el archivo JSON como texto
         const reader = new FileReader();
         reader.onload = function(event) {
-            const jsonContent = JSON.parse(event.target.result);  // Parseamos el contenido del archivo JSON
-            formData.append('file', JSON.stringify(jsonContent));  // Enviamos el contenido como un string JSON
-
-            // Ahora que el archivo está procesado, enviamos el formulario
+            const jsonContent = JSON.parse(event.target.result);  
+            formData.append('file', JSON.stringify(jsonContent));  
             enviarFormulario(formData);
         };
         reader.readAsText(file);  // Leemos el archivo como texto
