@@ -18,6 +18,12 @@
             {{ form.strength(class="form-select", id="scanIntensity") }}
         </div>
 
+         <!-- Email -->
+         <div class="mb-3">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control", id="email") }}
+        </div>
+
         <!-- Programar escaneo -->
         <div class="form-check form-switch mb-3">
                 {{ form.schedule.label(class="form-check-label", for="scheduleSwitch") }}

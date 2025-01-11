@@ -27,6 +27,7 @@ document.getElementById('scanForm').addEventListener('submit', (event) => {
  
     const url = document.getElementById('scanUrl').value; 
     const intensity = document.getElementById('scanIntensity').value;
+    const email = document.getElementById('email').value;
     const scheduled = scheduleSwitch.checked;  
     const dateTime = scheduled ? document.getElementById('datetimepicker').value : null;  
     const apiScan = apiSwitch.checked;  
@@ -41,6 +42,7 @@ document.getElementById('scanForm').addEventListener('submit', (event) => {
     const formData = new FormData();
     formData.append('url', url);
     formData.append('intensity', intensity);
+    formData.append('email', email)
     formData.append('scheduled', scheduled);
     formData.append('dateTime', dateTime);
     formData.append('apiScan', apiScan);

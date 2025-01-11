@@ -39,6 +39,7 @@ from sqlalchemy import text
 import json
 import time
 import pdb
+import re
 load_dotenv()
 
 def openai_client():
@@ -169,6 +170,13 @@ with app.app_context():
             query = interact_with_gpt_sql_reports(client,message, columnas)
             query = text(query)
             print(query)
+
+            pdb.set_trace()
+
+            match = re.search(r"targer_url = '([^']+)'",query)
+            if match:
+                url = match.group(1)
+                print("URL: ",url)
 
             pdb.set_trace()
 

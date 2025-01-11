@@ -6,8 +6,15 @@ import os
 from extensions import *
 from models import *
 import json
+import requests
+import base64
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 
-
+#variable global
+SCANER_ID = None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,12 +24,12 @@ logging.basicConfig(
         logging.FileHandler("zap_logs.log", mode="w", encoding="utf-8")
     ]
 )
-def load_env():
-    load_dotenv()
+
+load_dotenv()
 
 def connection_to_zap():
     try:
-        zap = ZAPv2(apikey=os.getenv("ZAP_API_KEY"),proxies={'http': 'http://127.0.0.1:8081'})
+        zap = ZAPv2(apikey=os.getenv("ZAP_API_KEY"), proxies={'http': 'http://localhost:8081'})#
         logging.info(zap.core.version)
         return zap
     except Exception as error:
@@ -37,8 +44,12 @@ def is_in_sites(zap,url):
            time.sleep(1)
            #is_in_sites(zap,url)
         else:
-            pass
-            logging.info("Url in Sites")
+            zap.core.new_session(name='nueva_sesion', overwrite=True)
+            logging.info("Nueva sesion...")
+            time.sleep(2)
+            zap.core.access_url(url)
+            time.sleep(1)
+            
     except Exception as error:
         logging.error(f"Error trying to add URL in Sites: {error}")
         exit(1)
@@ -168,6 +179,7 @@ def active_scan(zap,url,strength):
         #zap.core.new_session(name="sesion_unica", overwrite=True)
         time.sleep(2) ############################################################3
         scan_id = zap.ascan.scan(url)
+        
         while True:
             if int(zap.ascan.status(scan_id)) < 100:
                 logging.info(f"Scan Progress: {zap.ascan.status(scan_id)}")
@@ -183,10 +195,171 @@ def active_scan(zap,url,strength):
         db.session.add(escaneo_completado)
         db.session.commit()
         get_vulnerabilities(zap,url,fecha_fin)
+        SCANER_ID = scan_id
         return scan_id
         
     except Exception as error:
         logging.error(f"Error trying to Scan {url}: {error}")
         exit(1)
     
+
+
+
+
+def send_email(zap,url,email):
+#####################################################################################
+#####                       REPORTAR ALERTAS ALTAS Y MEDIAS               ###########
+#####################################################################################
+    # status = 0
+    # while True:
+    #     status = zap.ascan.status(SCANER_ID)
+    #     if status == 100:
+    #         break
+    # if status == 100:
+    alerts_high = set() 
+    alerts_medium = set()  
+    alerts_low = set()
+
+    st = 0
+    pg = 5000
+    alerts = zap.alert.alerts(baseurl=url, start=st, count=pg)
+
+    for alert in alerts:
+        alert_risk = alert.get('risk')
+        alert_name = alert.get('alert')
+
+        if alert_risk == 'High':
+            alerts_high.add(alert_name)  
+        elif alert_risk == 'Medium':
+            alerts_medium.add(alert_name)
+        elif alert_risk == 'Low':
+            alerts_low.add(alert_name)
+    #####################################################################################
+    #####                             GENERAR REPORTE                         ###########
+    #####################################################################################
+    report_path = '/tmp'
+    reporte = zap.reports.generate(
+        title='reporte_vulnerabilidades',
+        template='traditional-pdf',  
+        sites=url,               
+        reportdir=report_path,
+        reportfilename='reporte_vulnerabilidades' 
+    )
+
+    #####################################################################################
+    #####                   MANDAR CORREO UNA VEZ FINALIZADO                  ###########
+    #####################################################################################
+
+    # Función para enviar el correo usando SendGrid
+
+    sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
+    sendgrid_api_key = "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"
+
+    email_content = f"""
+    <html>
+        <body>
+            <p><strong>El escáner ha finalizado para las siguientes URLs:</strong></p>
+            <ul>
+                <li>{url}</li>
+            </ul>
+            <hr>
+            <p><strong>Resumen de vulnerabilidades encontradas:</strong></p>
+            <ul>
+                <li><strong>ALTAS:</strong> {len(alerts_high)}</li>
+                <li><strong>MEDIAS:</strong> {len(alerts_medium)}</li>
+                <li><strong>BAJAS:</strong> {len(alerts_low)}</li>
+            </ul>
+    """
+
+    if alerts_high:
+        email_content += """
+            <p><strong>Lista de alertas ALTAS:</strong></p>
+            <ul>
+        """
+        for alert in alerts_high:
+            email_content += f"<li>{alert}</li>"
+        email_content += "</ul>"
+
+    if alerts_medium:
+        email_content += """
+            <p><strong>Lista de alertas MEDIAS:</strong></p>
+            <ul>
+        """
+        for alert in alerts_medium:
+            email_content += f"<li>{alert}</li>"
+        email_content += "</ul>"
+    
+    if alerts_low:
+        email_content += """
+            <p><strong>Lista de alertas MEDIAS:</strong></p>
+            <ul>
+        """
+        for alert in alerts_low:
+            email_content += f"<li>{alert}</li>"
+        email_content += "</ul>"
+
+    email_content += """
+        </body>
+    </html>
+    """
+
+    # Crear el objeto de mensaje MIME para incluir el archivo adjunto
+    msg = MIMEMultipart()
+    msg['From'] = "zapautomatic3@gmail.com"
+    msg['To'] = f"{email}"
+    msg['Subject'] = f"Escáner finalizado para la URL: {url}"
+    msg.attach(MIMEText(email_content, 'html'))
+
+    path_pdf = os.path.join(report_path, "reporte_vulnerabilidades.pdf")
+    # Abrir el archivo PDF generado y adjuntarlo
+    with open(path_pdf, "rb") as attachment:
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f"attachment; filename={os.path.basename(path_pdf)}")
+        msg.attach(part)
+
+
+    # Configurar los datos para SendGrid
+    email_data = {
+        "personalizations": [
+            {
+                "to": [{"email": f"{email}"}],
+                "subject": f"Escáner finalizado para la URL: {url}"
+            }
+        ],
+        "from": {
+            "email": "zapautomatic3@gmail.com"
+        },
+        "content": [
+            {
+                "type": "text/html",
+                "value": email_content
+            }
+        ],
+        "attachments": [
+            {
+                "content": base64.b64encode(open(path_pdf, "rb").read()).decode(),
+                "type": "application/pdf",
+                "filename": os.path.basename(path_pdf)
+            }
+        ]
+    }
+
+    # Cabeceras para autenticación con SendGrid
+    headers = {
+        "Authorization": f"Bearer {sendgrid_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    # Solicitud POST para enviar el correo
+    response = requests.post(sendgrid_url, headers=headers, data=json.dumps(email_data))
+
+    # Verificar respuesta
+    if response.status_code == 202:
+        print("Correo enviado con éxito.")
+    else:
+        print(f"Error al enviar el correo. Código de respuesta: {response.status_code}")
+        print(response.text)
+
 

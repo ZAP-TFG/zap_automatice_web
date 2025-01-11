@@ -66,6 +66,7 @@ def allowed_file(filename):
 def process_scan():
     url = request.form.get('url')
     intensity = request.form.get('intensity')
+    email = request.form.get('email')
     scheduled = request.form.get('scheduled') == 'true'  
     dateTime = request.form.get('dateTime')  
     apiScan = request.form.get('apiScan') == 'true'  
@@ -110,6 +111,7 @@ def process_scan():
             zap = connection_to_zap()
             is_in_sites(zap, url)
             scan_id = active_scan(zap, url, intensity)
+            send_email(zap,url,email)
             return jsonify({'status': 'success', 'message': f'Escaneo completado con ID {scan_id}'}), 200
         except Exception as error:
             return jsonify({'status': 'error', 'message': f'Error durante el escaneo: {error}'}), 500
