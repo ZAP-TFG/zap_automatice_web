@@ -55,7 +55,53 @@ def scan():
 @app.route('/reports', methods=['GET', 'POST'])
 def chat_vul():
     form = ChatForm()
-    return render_template('vulnerabilities.html', form=form)
+    return render_template('reports.html', form=form)
+
+
+@app.route('/vulnerabilidades', methods=['GET', 'POST'])
+def vulnerabilities():
+    form = Vulnerabilities()
+    
+    url = form.url.data  
+    if url:  
+        reports = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(2).all()
+
+        vulnerabilidades_ultima_fecha = reports[0] if len(reports) > 0 else None
+        vulnerabilidades_fecha_anterior = reports[1] if len(reports) > 1 else None
+
+        data1 = {
+            "pieChartNew": {
+                "labels": ["Info", "Low", "Medium", "High"],
+                "data": [
+                    vulnerabilidades_ultima_fecha.vul_info if vulnerabilidades_ultima_fecha else 0,
+                    vulnerabilidades_ultima_fecha.vul_bajas if vulnerabilidades_ultima_fecha else 0,
+                    vulnerabilidades_ultima_fecha.vul_medias if vulnerabilidades_ultima_fecha else 0,
+                    vulnerabilidades_ultima_fecha.vul_altas if vulnerabilidades_ultima_fecha else 0,
+                ]
+            }
+        }
+
+        data2 = {
+            "pieChartPast": {
+                "labels": ["Info", "Low", "Medium", "High"],
+                "data": [
+                    vulnerabilidades_fecha_anterior.vul_info if vulnerabilidades_fecha_anterior else 0,
+                    vulnerabilidades_fecha_anterior.vul_bajas if vulnerabilidades_fecha_anterior else 0,
+                    vulnerabilidades_fecha_anterior.vul_medias if vulnerabilidades_fecha_anterior else 0,
+                    vulnerabilidades_fecha_anterior.vul_altas if vulnerabilidades_fecha_anterior else 0,
+                ]
+            }
+        }
+    else:
+        
+        data1 = {"pieChartNew": {"labels": ["Info", "Low", "Medium", "High"], "data": [0, 0, 0, 0]}}
+        data2 = {"pieChartPast": {"labels": ["Info", "Low", "Medium", "High"], "data": [0, 0, 0, 0]}}
+
+    return render_template('vulnerabilities.html', form=form, data1=data1, data2=data2)
+
+
+
+
 
 def allowed_file(filename):
     """Verifica si el archivo tiene una extensión permitida"""

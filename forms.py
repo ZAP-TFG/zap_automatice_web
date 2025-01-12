@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms.validators import DataRequired, InputRequired, Email, Optional, ValidationError
+from wtforms.validators import DataRequired, InputRequired, Email, Optional, ValidationError, URL
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, DateTimeLocalField, FileField
 
 
@@ -22,3 +22,7 @@ class ChatForm(FlaskForm):
     message = StringField('User Message', validators=[DataRequired()], render_kw={"placeholder": "Escribe mensage aqui"})
     submit = SubmitField('Enviar')
     submit2 = SubmitField('Configuracion')
+
+class Vulnerabilities(FlaskForm):
+    url = StringField('URL', validators=[DataRequired(), URL()], render_kw={"placeholder": "https://example.com"})
+    submit = SubmitField('Comparar')
