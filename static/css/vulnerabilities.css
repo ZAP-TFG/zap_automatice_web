@@ -1,0 +1,43 @@
+h2 {
+    text-align: center;
+}
+
+
+/* Estilo para la tabla */
+.table-container {
+    flex: 1; /* La tabla ocupará la otra mitad */
+    overflow-y: auto; /* Si la tabla es demasiado larga, permitirá desplazamiento vertical */
+    max-height: 400px; /* Limitar la altura de la tabla */
+}
+
+/* Estilo de la tabla */
+.table {
+    text-align: left; 
+    color: white; /* Cambiar el color de todo el texto dentro de la tabla a blanco */
+    background-color: #333; /* Fondo oscuro para que el texto blanco sea visible */
+}
+
+/* Estilo de los encabezados de la tabla */
+.table th {
+    background-color: #444; /* Fondo oscuro para los encabezados */
+    color: white; /* Color blanco para el texto de los encabezados */
+}
+
+/* Estilo de las celdas de la tabla */
+.table td {
+    color: white; /* Color blanco para el texto de las celdas */
+}
+
+/* Estilo adicional para los títulos dentro de la tarjeta */
+.card-title {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+/* Canvas ajustado */
+canvas {
+    max-width: 400px;
+    max-height: 400px;
+    display: block;
+    margin: 0 auto;
+}

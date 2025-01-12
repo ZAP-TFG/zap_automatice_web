@@ -1,9 +1,13 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<link rel="stylesheet" href="/static/css/vulnerabilities.css">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="/static/js/vulnerabilities.js"></script>
+
 <div class="container mt-5">
-    <h2 class="mb-4">Vulnerabilities</h2>
-    <form id="scanForm" method="post" enctype="multipart/form-data">
+    <h2 class="mb-4"><strong>VULNERABILITIES</strong></h2>
+    <form id="vulnerabiliesForm" method="post" enctype="multipart/form-data">
         {{ form.hidden_tag() }}  <!-- CSRF token -->
         
         <!-- URL -->
@@ -19,29 +23,85 @@
 </div>
 
 <div class="row">
-    <div class="col-md-5">
+    <div class="col-md-12">
         <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Old Scan</h5>
-                <canvas id="pieChartPast"  width="400" height="400"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-5">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">New Scan</h5>
-                <canvas id="pieChartNew"  width="400" height="400"></canvas>
+            <div class="card-body d-flex">
+                <!-- Gráfico del escaneo anterior -->
+                <div class="chart-container" style="flex: 1; margin-right: 20px;">
+                    <h3 class="card-title">Old Scan</h3>
+                    <canvas id="pieChartPast" width="400" height="400"></canvas>
+                </div>
+
+                <!-- Tabla de alertas -->
+                <div class="table-container" style="flex: 1;">
+                    <h3 class="card-title">Alerts Old Scan</h3>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Riesgo</th>
+                                <th>Alerta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for alert in data3.alertsOld %}
+                            <tr>
+                                <td>{{ alert.riskdesc }}</td>
+                                <td>{{ alert.alert }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
+<hr>
+    <!-- Card for Last Scan with Pie Chart -->
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body d-flex">
+                <!-- Gráfico del escaneo anterior -->
+                <div class="chart-container" style="flex: 1; margin-right: 20px;">
+                    <h3 class="card-title">Last Scan</h3>
+                    <canvas id="pieChartNew" width="400" height="400"></canvas>
+                </div>
+
+                <!-- Tabla de alertas -->
+                <div class="table-container" style="flex: 1;">
+                    <h3 class="card-title">Alerts Last Scan</h3>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Riesgo</th>
+                                <th>Alerta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for alert in data4.alertsNew %}
+                            <tr>
+                                <td>{{ alert.riskdesc }}</td>
+                                <td>{{ alert.alert }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // Obtener datos enviados desde el backend
     const data1 = {{ data1|tojson }};
     const data2 = {{ data2|tojson }};
+    const data3 = {{ data3|tojson }}; 
+    const data4 = {{ data4|tojson }};  // Datos de alertas para la tabla
 
     // Configuración para el gráfico del último escaneo
     const ctxNew = document.getElementById('pieChartNew').getContext('2d');
