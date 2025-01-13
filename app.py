@@ -65,144 +65,115 @@ def chat_vul():
 @app.route('/vulnerabilidades', methods=['GET', 'POST'])
 def vulnerabilities():
     form = Vulnerabilities()
-    
-    url = form.url.data  
+    return render_template('vulnerabilities.html', form=form)
+ 
+@app.route('/vulnerabilidades_graficas', methods=['POST'])
+def vulnerabilidades_charts():
+    url = request.form.get('url')
+    if not url:
+        return jsonify({"error": "URL no proporcionada"}), 400
+
+    # Consulta a la base de datos
+    vulnerabilities = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(2).all()
+
+    # Manejo de datos encontrados
+    if len(vulnerabilities) == 0:
+        return jsonify({"error": "No se encontraron datos para la URL proporcionada"}), 404
+
+    vulnerabilidades_ultima_fecha = vulnerabilities[0]
+    vulnerabilidades_fecha_anterior = vulnerabilities[1] if len(vulnerabilities) > 1 else None
+
+    # Gráficos
     data1 = {
         "pieChartNew": {
             "labels": ["Info", "Low", "Medium", "High"],
-            "data": [0, 0, 0, 0]
+            "data": [
+                vulnerabilidades_ultima_fecha.vul_info if vulnerabilidades_ultima_fecha else 0,
+                vulnerabilidades_ultima_fecha.vul_bajas if vulnerabilidades_ultima_fecha else 0,
+                vulnerabilidades_ultima_fecha.vul_medias if vulnerabilidades_ultima_fecha else 0,
+                vulnerabilidades_ultima_fecha.vul_altas if vulnerabilidades_ultima_fecha else 0,
+            ]
         }
     }
+
     data2 = {
         "pieChartPast": {
             "labels": ["Info", "Low", "Medium", "High"],
-            "data": [0, 0, 0, 0]
+            "data": [
+                vulnerabilidades_fecha_anterior.vul_info if vulnerabilidades_fecha_anterior else 0,
+                vulnerabilidades_fecha_anterior.vul_bajas if vulnerabilidades_fecha_anterior else 0,
+                vulnerabilidades_fecha_anterior.vul_medias if vulnerabilidades_fecha_anterior else 0,
+                vulnerabilidades_fecha_anterior.vul_altas if vulnerabilidades_fecha_anterior else 0,
+            ]
         }
     }
+
+    # Alertas anteriores
+    report_json_old = vulnerabilidades_fecha_anterior.report_file if vulnerabilidades_fecha_anterior else {}
+    alerts_old = report_json_old.get("site", [])[0].get("alerts", []) if report_json_old else []
     data3 = {
-        "alertsOld": []
+        "alertsOld": [
+            {
+                "riskdesc": alert.get("riskdesc", "Unknown"),
+                "alert": alert.get("alert", "No alert description")
+            }
+            for alert in alerts_old
+        ]
     }
-    data4 = {  
-        "alertsNew": []
+
+    # Alertas nuevas
+    report_json_new = vulnerabilidades_ultima_fecha.report_file if vulnerabilidades_ultima_fecha else {}
+    alerts_new = report_json_new.get("site", [])[0].get("alerts", []) if report_json_new else []
+    data4 = {
+        "alertsNew": [
+            {
+                "riskdesc": alert.get("riskdesc", "Unknown"),
+                "alert": alert.get("alert", "No alert description")
+            }
+            for alert in alerts_new
+        ]
     }
 
-    if url:  
-        vulnerabilities = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(2).all()
+    # Construcción de la respuesta final
+    response = {
+        "data1": data1,
+        "data2": data2,
+        "data3": data3,
+        "data4": data4
+    }
+    return jsonify(response)
 
-        if len(vulnerabilities) > 0:
-            vulnerabilidades_ultima_fecha = vulnerabilities[0]  # Último escaneo
-            vulnerabilidades_fecha_anterior = vulnerabilities[1] if len(vulnerabilities) > 1 else None
-
-            
-            data1 = {
-                "pieChartNew": {
-                    "labels": ["Info", "Low", "Medium", "High"],
-                    "data": [
-                        vulnerabilidades_ultima_fecha.vul_info if vulnerabilidades_ultima_fecha else 0,
-                        vulnerabilidades_ultima_fecha.vul_bajas if vulnerabilidades_ultima_fecha else 0,
-                        vulnerabilidades_ultima_fecha.vul_medias if vulnerabilidades_ultima_fecha else 0,
-                        vulnerabilidades_ultima_fecha.vul_altas if vulnerabilidades_ultima_fecha else 0,
-                    ]
-                }
-            }
-
-            data2 = {
-                "pieChartPast": {
-                    "labels": ["Info", "Low", "Medium", "High"],
-                    "data": [
-                        vulnerabilidades_fecha_anterior.vul_info if vulnerabilidades_fecha_anterior else 0,
-                        vulnerabilidades_fecha_anterior.vul_bajas if vulnerabilidades_fecha_anterior else 0,
-                        vulnerabilidades_fecha_anterior.vul_medias if vulnerabilidades_fecha_anterior else 0,
-                        vulnerabilidades_fecha_anterior.vul_altas if vulnerabilidades_fecha_anterior else 0,
-                    ]
-                }
-            }
-
-            report_json_old = vulnerabilidades_fecha_anterior.report_file if vulnerabilidades_fecha_anterior else {}
-            alertas_all_old = []
-            alerts_old = report_json_old.get("site", [])[0].get("alerts", []) if report_json_old else []
-
-            for alert in alerts_old:
-                alert_data = {
-                    "riskdesc": alert.get("riskdesc", "No Risk Description"),
-                    "alert": alert.get("alert", "Unknown Alert")
-                }
-                alertas_all_old.append(alert_data)
-
-           
-            data3 = {
-                "alertsOld": [
-                    {
-                        "riskdesc": alert.get("riskdesc", "Unknown"), 
-                        "alert": alert.get("alert", "No alert description")  
-                    }
-                    for alert in alertas_all_old
-                ]
-            }
-
-           
-            report_json_new = vulnerabilidades_ultima_fecha.report_file if vulnerabilidades_ultima_fecha else {}
-            alertas_all_new = []
-            alerts_new = report_json_new.get("site", [])[0].get("alerts", []) if report_json_new else []
-
-            for alert in alerts_new:
-                alert_data = {
-                    "riskdesc": alert.get("riskdesc", "No Risk Description"),
-                    "alert": alert.get("alert", "Unknown Alert")
-                }
-                alertas_all_new.append(alert_data)
-
-           
-            data4 = {
-                "alertsNew": [
-                    {
-                        "riskdesc": alert.get("riskdesc", "Unknown"), 
-                        "alert": alert.get("alert", "No alert description")  
-                    }
-                    for alert in alertas_all_new
-                ]
-            } 
-            REPORT_NEW = report_json_new
-            REPORT_OLD = report_json_old  
-    return render_template('vulnerabilities.html', form=form, data1=data1, data2=data2, data3=data3, data4=data4)
-
-
-@app.route('/obtener_comparativa_vulnerabilidades', methods=['POST'])
+@app.route('/vulnerabilidades_chatgpt', methods=['POST'])
 def obtener_comparativa_vulnerabilidades():
     url = request.form.get('url')
+    if not url:
+        return jsonify({'error': 'No se proporcionó una URL válida'}), 400
+
     vulnerabilities = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(2).all()
 
     if len(vulnerabilities) > 0:
-        vulnerabilidades_ultima_fecha = vulnerabilities[0]  # Último escaneo
+        vulnerabilidades_ultima_fecha = vulnerabilities[0]
         vulnerabilidades_fecha_anterior = vulnerabilities[1] if len(vulnerabilities) > 1 else None
         report_new = vulnerabilidades_ultima_fecha.report_file if vulnerabilidades_ultima_fecha else {}
         report_old = vulnerabilidades_fecha_anterior.report_file if vulnerabilidades_fecha_anterior else {}
         try:
             client = openai_client()
             completion = client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB al que le van pasar dos reportes y lo más resumido posible sacar las diferencias entre las vulnerabilidades que hay. Bien estructurado y que sea corto. El primero es el utlimo realizado y el segundo es el anterior."},
-                    {
-                        "role": "user",
-                        "content": json.dumps(report_new)  
-                    },
-                    {
-                        "role": "user",
-                        "content": json.dumps(report_old) 
-                    }
+                    {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB, donde te van a pasar dos reportes, el primero es el ultimo realizado y el segundo es el anterior. TU objetivo es comparalos y sacar las diferencias entre vulnerabilidades. Y si puedes buscar en internet como mejorarlo, el CVE, OWASP-TOP-10 al que pertenece...Tiene que ser bien estrcuturado y poder ser no muy extenso. En vez de markdown escribemelo en HTML."},
+                    {"role": "user", "content": json.dumps(report_new)},
+                    {"role": "user", "content": json.dumps(report_old)}
                 ]
             )
-            response = completion.choices[0].message.content
-            print(response)
-
-            # Aquí deberías devolver la respuesta en formato JSON
+            response = completion.choices[0].message.content.strip()  # Asegurarse de limpiar espacios innecesarios
             return jsonify({'comparativa': response})
-
         except Exception as e:
             logging.error(f"Error al interactuar con el LLM: {e}")
-            # Si hay error, retornar un mensaje adecuado
             return jsonify({'error': 'Ocurrió un error al procesar los reportes'}), 500
+    else:
+        return jsonify({'comparativa': 'No se encontraron datos para la URL proporcionada.'})
+
 
 
 

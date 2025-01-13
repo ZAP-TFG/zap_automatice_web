@@ -1,33 +1,95 @@
 $(document).ready(function() {
-    // Cuando el formulario se envía
-    $('#vulnerabiliesForm').on('submit', function(event) {
-        // Aquí solo evitamos el envío para AJAX, pero permitimos el comportamiento tradicional (recarga de la página)
-        var url = $('#scanUrl').val();  // Asumiendo que el ID del campo es 'scanUrl'
+    // Referencias a las gráficas de Chart.js
+    let pieChartNew, pieChartPast;
 
-        // Construir los datos a enviar
-        var formData = {
-            'url': url
-        };
+    $('#vulnerabilitiesForm').on('submit', function(event) {
+        event.preventDefault(); 
 
-        // Hacer la solicitud AJAX
+        var url = $('#scanUrl').val(); 
+
+        if (!url) {
+            alert("Por favor, introduce una URL.");
+            return;
+        }
+
         $.ajax({
-            url: '/obtener_comparativa_vulnerabilidades',  // La ruta Flask que manejará la consulta
-            type: 'POST',  // Método de la solicitud
-            data: formData,  // Los datos del formulario
+            url: '/vulnerabilidades_graficas', 
+            type: 'POST',
+            data: { url: url }, 
             success: function(response) {
-                // Si la solicitud es exitosa, procesamos la respuesta
-                console.log(response);  // Puedes ver la respuesta en la consola
+                const newData = response.data1.pieChartNew.data;
+                const pastData = response.data2.pieChartPast.data;
 
-                // Actualiza la interfaz con la respuesta del modelo
-                // Supongamos que la respuesta contiene la comparativa de vulnerabilidades
-                $('#comparativaVulnerabilidades').text(response.comparativa);  // Muestra la respuesta en el div
+                // Crear o actualizar gráficas
+                if (pieChartNew) {
+                    pieChartNew.data.datasets[0].data = newData;
+                    pieChartNew.update();
+                } else {
+                    pieChartNew = new Chart(document.getElementById('pieChartNew'), {
+                        type: 'pie',
+                        data: {
+                            labels: response.data1.pieChartNew.labels,
+                            datasets: [{
+                                data: newData,
+                                backgroundColor: ['#4caf50', '#ffeb3b', '#ff9800', '#f44336']
+                            }]
+                        }
+                    });
+                }
+
+                if (pieChartPast) {
+                    pieChartPast.data.datasets[0].data = pastData;
+                    pieChartPast.update();
+                } else {
+                    pieChartPast = new Chart(document.getElementById('pieChartPast'), {
+                        type: 'pie',
+                        data: {
+                            labels: response.data2.pieChartPast.labels,
+                            datasets: [{
+                                data: pastData,
+                                backgroundColor: ['#4caf50', '#ffeb3b', '#ff9800', '#f44336']
+                            }]
+                        }
+                    });
+                }
+
+                // Actualizar tablas de alertas
+                $('#alertsOldTable').empty();
+                response.data3.alertsOld.forEach(alert => {
+                    $('#alertsOldTable').append(`
+                        <tr>
+                            <td>${alert.riskdesc}</td>
+                            <td>${alert.alert}</td>
+                        </tr>
+                    `);
+                });
+
+                $('#alertsNewTable').empty();
+                response.data4.alertsNew.forEach(alert => {
+                    $('#alertsNewTable').append(`
+                        <tr>
+                            <td>${alert.riskdesc}</td>
+                            <td>${alert.alert}</td>
+                        </tr>
+                    `);
+                });
             },
-            error: function(xhr, status, error) {
-                // Manejo de errores si la solicitud falla
-                console.error('Error en la solicitud:', error);
+            error: function(xhr) {
+                alert("Error: " + xhr.responseJSON.error);
             }
         });
 
-        // No usamos event.preventDefault() aquí, para que el formulario se pueda enviar y la página se recargue
+        $.ajax({
+            url: '/vulnerabilidades_chatgpt',
+            type: 'POST',
+            data: { url: url },
+            success: function(response) {
+                // Mostrar la comparativa en el contenedor
+                $('#chatgptResponse').html(response.comparativa);
+            },
+            error: function(xhr) {
+                $('#chatgptResponse').text("Error: " + (xhr.responseJSON.error || "No se pudo generar la comparativa."));
+            }
+        });
     });
 });
