@@ -291,7 +291,7 @@ def send_email(zap,url,email):
     
     if alerts_low:
         email_content += """
-            <p><strong>Lista de alertas MEDIAS:</strong></p>
+            <p><strong>Lista de alertas BAJAS:</strong></p>
             <ul>
         """
         for alert in alerts_low:

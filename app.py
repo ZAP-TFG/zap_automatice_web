@@ -254,133 +254,189 @@ def chatbot():
     form = ChatForm()
     return render_template("chatbot.html", form=form)
 
-@app.route('/chatget', methods=['POST'])
-def chatget():
-    client = openai_client()
-    user_message = request.json.get('message')
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Eres un asistente experto en vulnerabilidades web"},
-                { "role": "user", "content": user_message}
-            ]
-        )
-        return jsonify({"reply": response.choices[0].message.content})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route('/context_chatgpt', methods=['POST'])
+def interact_with_gpt_context():
+    data = request.get_json()  # Obtienes los datos del JSON enviado en la solicitud POST
+    prompt = data.get('message')  # El mensaje del usuario
 
-@app.route('/chatconfig', methods=['POST'])
-def chatconfig():
-    client = openai_client()
-    user_message = request.json.get('message')
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Eres un asistento al que le van a pasar una configuracion y tu tienes que sacar solo la url, la fecha en formato Datetime y la intesidad, sacamelo en formato JSON"},
-                { "role": "user", "content": user_message}
-            ]
-        )
-        return jsonify({"reply": response.choices[0].message.content})
-    except Exception as e:
-        logging.error("error al comunicarse con la api")
-        exit(1)
-
-@app.route('/api/vulnerabilidaes', methods=['POST'])
-def chat_sql():
-    client = openai_client()
-    user_message = request.json.get('message')
-    inspector = inspect(db.engine)
-    columnas = inspector.get_columns("reportes_vulnerabilidades_url")
+    if not prompt:
+        return jsonify({'error': 'No se proporcionó el mensaje'}), 400  # Validar que haya un mensaje
 
     try:
-        # Interactuar con OpenAI para obtener la consulta SQL
-        response = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": "Eres un asistente especializado en consultas SQL al que le voy a pasar la informacion de la tabla de la bbdd para que pueda realizar su consulta saviendo que la tabla se llama reportes_vulnerabilidades_url. Las vulnerabilidades se encuentran en el report_file. Solo quiero la consulta, no quiero explicaiones ni que pongas ```sql "},
-                {"role": "system", "content": f"{columnas}"},
-                {"role": "user", "content": user_message}
-            ]
-        )
-        
-        if not response or not response.choices or not response.choices[0].message.content:
-            raise ValueError("Respuesta inválida o incompleta de OpenAI")
-        
-        sql_query = response.choices[0].message.content
-        if not sql_query.lower().startswith("select"):
-            raise ValueError(f"Consulta SQL inválida: {sql_query}")
+        # Crear el cliente OpenAI
+        client = openai_client()
 
-        
-        query = text(sql_query)
-        try:
-            resultados = db.session.execute(query).fetchall()
-        except Exception as e:
-            logging.error(f"Error al ejecutar la consulta SQL: {e}")
-            return jsonify({"error": "Error en la consulta SQL.", "details": str(e)}), 400
-
-        
-        try:
-            report_file = [json.loads(fila[0]) for fila in resultados]
-        except json.JSONDecodeError as e:
-            logging.error(f"Error al decodificar JSON: {e}")
-            return jsonify({"error": "Error al procesar resultados.", "details": str(e)}), 500
-
-        json_file = json.dumps(report_file, indent=4)
-        response2 = chat_resum_vul(client, json_file)
-
-        # Continuar con el resto de la lógica
-        # url = None
-        # for fila in report_file:
-        #     if 'site' in fila:
-        #         for site in fila['site']:
-        #             if '@name' in site:
-        #                 url = site['@name']
-        #     if url:
-        #         break
-
-        # vul_urls = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(len(json_file)).all()
-        # data = {
-        #     "chart_data": {
-        #         "labels": ["Info", "Low", "Medium", "High"],
-        #         "data_first_row": [
-        #             vul_urls[0].vul_altas if len(vul_urls) > 0 else 0,
-        #             vul_urls[0].vul_medias if len(vul_urls) > 0 else 0,
-        #             vul_urls[0].vul_bajas if len(vul_urls) > 0 else 0,
-        #             vul_urls[0].vul_info if len(vul_urls) > 0 else 0,
-        #         ],
-        #         "data_second_row": [
-        #             vul_urls[1].vul_altas if len(vul_urls) > 1 else 0,
-        #             vul_urls[1].vul_medias if len(vul_urls) > 1 else 0,
-        #             vul_urls[1].vul_bajas if len(vul_urls) > 1 else 0,
-        #             vul_urls[1].vul_info if len(vul_urls) > 1 else 0,
-        #         ]
-        #     }
-        # }
-        return jsonify({"reply": response2})
-
-    except Exception as e:
-        logging.error(f"Error al comunicarse con la API: {e}")
-        return jsonify({"error": "Ocurrió un error en el servidor.", "details": str(e)}), 500
-
-
-def chat_resum_vul(client, bbdd_data):
-    try:
-
+        # Llamada a la API de OpenAI para generar la respuesta
         completion = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB al que le van a pasar uno o dos reportes y lo mas resumido posible sacar las diferencias. Bien estructurado y que sea corto"},
+                {"role": "system", "content": """  Eres un asistente especializado en sacar el contexto de lo que te están pidiendo. Lo que saques tiene que ser en formato JSON. Te voy a poner ejemplos:
+                1. Cuando te pidan configurar o programar un escáner, el contexto será: configuracion
+                2. '¿Qué hay de nuevo respecto ayer?' o 'hay algun escaner nuevo' ... será: historial.
+                3. Cuando te pidan preguntas normales será: general.
+                4. Cuando te pidan datos sobre una url será: vulnerabilidades. 
+                Posibles contextos: configuracion, vulnerabilidades, general, historial.
+                Por ultimo tienes que poner  { "contexto": "" , "message": ""} y en el message tienes que copiar y pegar el mensage del usuario"""},
                 {
                     "role": "user",
-                    "content": bbdd_data
+                    "content": prompt
                 }
             ]
         )
-        return completion.choices[0].message.content
+
+        # Retornar el contexto obtenido por GPT
+        return jsonify({'reply': completion.choices[0].message.content})
+
     except Exception as e:
-        logging.error(f"Error al interactuar con el LLM")
+        logging.error(f"Error al interactuar con el LLM: {str(e)}")
+        return jsonify({'error': 'Hubo un problema al procesar la solicitud.'}), 500
+
+@app.route('/respuesta_chatgpt', methods=['POST'])
+def respuesta_chatgpt():
+    data = request.get_json()
+    print("Datos recibidos:", data)
+    context = data.get('contexto')
+    message = data.get('message')
+    if not context or not message:
+        return jsonify({'reply':"Faltan 'contexto' o 'message' en los datos"}), 400
+    if context == "configuracion":
+        return jsonify({'reply': context})
+    elif context == "vulnerabilidades":
+       return jsonify({'reply': context})
+    elif context == "historial":
+        return jsonify({'reply': context})
+    elif context == "general":
+        return jsonify({'reply': context})
+    else:
+        return jsonify({"error": "Contexto desconocido"}), 400
+
+# @app.route('/chatget', methods=['POST'])
+# def chatget():
+#     client = openai_client()
+#     user_message = request.json.get('message')
+#     try:
+#         response = client.chat.completions.create(
+#             model="gpt-3.5-turbo",
+#             messages=[
+#                 {"role": "system", "content": "Eres un asistente experto en vulnerabilidades web"},
+#                 { "role": "user", "content": user_message}
+#             ]
+#         )
+#         return jsonify({"reply": response.choices[0].message.content})
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+# @app.route('/chatconfig', methods=['POST'])
+# def chatconfig():
+#     client = openai_client()
+#     user_message = request.json.get('message')
+#     try:
+#         response = client.chat.completions.create(
+#             model="gpt-3.5-turbo",
+#             messages=[
+#                 {"role": "system", "content": "Eres un asistento al que le van a pasar una configuracion y tu tienes que sacar solo la url, la fecha en formato Datetime y la intesidad, sacamelo en formato JSON"},
+#                 { "role": "user", "content": user_message}
+#             ]
+#         )
+#         return jsonify({"reply": response.choices[0].message.content})
+#     except Exception as e:
+#         logging.error("error al comunicarse con la api")
+#         exit(1)
+
+# @app.route('/api/vulnerabilidaes', methods=['POST'])
+# def chat_sql():
+#     client = openai_client()
+#     user_message = request.json.get('message')
+#     inspector = inspect(db.engine)
+#     columnas = inspector.get_columns("reportes_vulnerabilidades_url")
+
+#     try:
+#         # Interactuar con OpenAI para obtener la consulta SQL
+#         response = client.chat.completions.create(
+#             model="gpt-4-turbo",
+#             messages=[
+#                 {"role": "system", "content": "Eres un asistente especializado en consultas SQL al que le voy a pasar la informacion de la tabla de la bbdd para que pueda realizar su consulta saviendo que la tabla se llama reportes_vulnerabilidades_url. Las vulnerabilidades se encuentran en el report_file. Solo quiero la consulta, no quiero explicaiones ni que pongas ```sql "},
+#                 {"role": "system", "content": f"{columnas}"},
+#                 {"role": "user", "content": user_message}
+#             ]
+#         )
+        
+#         if not response or not response.choices or not response.choices[0].message.content:
+#             raise ValueError("Respuesta inválida o incompleta de OpenAI")
+        
+#         sql_query = response.choices[0].message.content
+#         if not sql_query.lower().startswith("select"):
+#             raise ValueError(f"Consulta SQL inválida: {sql_query}")
+
+        
+#         query = text(sql_query)
+#         try:
+#             resultados = db.session.execute(query).fetchall()
+#         except Exception as e:
+#             logging.error(f"Error al ejecutar la consulta SQL: {e}")
+#             return jsonify({"error": "Error en la consulta SQL.", "details": str(e)}), 400
+
+        
+#         try:
+#             report_file = [json.loads(fila[0]) for fila in resultados]
+#         except json.JSONDecodeError as e:
+#             logging.error(f"Error al decodificar JSON: {e}")
+#             return jsonify({"error": "Error al procesar resultados.", "details": str(e)}), 500
+
+#         json_file = json.dumps(report_file, indent=4)
+#         response2 = chat_resum_vul(client, json_file)
+
+#         # Continuar con el resto de la lógica
+#         # url = None
+#         # for fila in report_file:
+#         #     if 'site' in fila:
+#         #         for site in fila['site']:
+#         #             if '@name' in site:
+#         #                 url = site['@name']
+#         #     if url:
+#         #         break
+
+#         # vul_urls = Reportes_vulnerabilidades_url.query.filter_by(target_url=url).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(len(json_file)).all()
+#         # data = {
+#         #     "chart_data": {
+#         #         "labels": ["Info", "Low", "Medium", "High"],
+#         #         "data_first_row": [
+#         #             vul_urls[0].vul_altas if len(vul_urls) > 0 else 0,
+#         #             vul_urls[0].vul_medias if len(vul_urls) > 0 else 0,
+#         #             vul_urls[0].vul_bajas if len(vul_urls) > 0 else 0,
+#         #             vul_urls[0].vul_info if len(vul_urls) > 0 else 0,
+#         #         ],
+#         #         "data_second_row": [
+#         #             vul_urls[1].vul_altas if len(vul_urls) > 1 else 0,
+#         #             vul_urls[1].vul_medias if len(vul_urls) > 1 else 0,
+#         #             vul_urls[1].vul_bajas if len(vul_urls) > 1 else 0,
+#         #             vul_urls[1].vul_info if len(vul_urls) > 1 else 0,
+#         #         ]
+#         #     }
+#         # }
+#         return jsonify({"reply": response2})
+
+#     except Exception as e:
+#         logging.error(f"Error al comunicarse con la API: {e}")
+#         return jsonify({"error": "Ocurrió un error en el servidor.", "details": str(e)}), 500
+
+
+# def chat_resum_vul(client, bbdd_data):
+#     try:
+
+#         completion = client.chat.completions.create(
+#             model="gpt-4-turbo",
+#             messages=[
+#                 {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB al que le van a pasar uno o dos reportes y lo mas resumido posible sacar las diferencias. Bien estructurado y que sea corto"},
+#                 {
+#                     "role": "user",
+#                     "content": bbdd_data
+#                 }
+#             ]
+#         )
+#         return completion.choices[0].message.content
+#     except Exception as e:
+#         logging.error(f"Error al interactuar con el LLM")
 
 if __name__ == '__main__':
     init_sheduler_scans()
