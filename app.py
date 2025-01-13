@@ -161,7 +161,7 @@ def obtener_comparativa_vulnerabilidades():
             completion = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB, donde te van a pasar dos reportes, el primero es el ultimo realizado y el segundo es el anterior. TU objetivo es comparalos y sacar las diferencias entre vulnerabilidades. Y si puedes buscar en internet como mejorarlo, el CVE, OWASP-TOP-10 al que pertenece...Tiene que ser bien estrcuturado y poder ser no muy extenso. En vez de markdown escribemelo en HTML."},
+                    {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB, donde te van a pasar dos reportes, el primero es el ultimo realizado y el segundo es el anterior. TU objetivo es comparalos y sacar las diferencias entre vulnerabilidades. Y si puedes buscar en internet como mejorarlo, el CVE, OWASP-TOP-10 al que pertenece...Tiene que ser bien estrcuturado y poder ser no muy extenso. En vez de markdown escribemelo en HTML y en español."},
                     {"role": "user", "content": json.dumps(report_new)},
                     {"role": "user", "content": json.dumps(report_old)}
                 ]
@@ -274,7 +274,7 @@ def interact_with_gpt_context():
                 1. Cuando te pidan configurar o programar un escáner, el contexto será: configuracion
                 2. '¿Qué hay de nuevo respecto ayer?' o 'hay algun escaner nuevo' ... será: historial.
                 3. Cuando te pidan preguntas normales será: general.
-                4. Cuando te pidan datos sobre una url será: vulnerabilidades. 
+                4. Cuando te pidan datos sobre una url será: vulnerabilidades.
                 Posibles contextos: configuracion, vulnerabilidades, general, historial.
                 Por ultimo tienes que poner  { "contexto": "" , "message": ""} y en el message tienes que copiar y pegar el mensage del usuario"""},
                 {
@@ -300,15 +300,60 @@ def respuesta_chatgpt():
     if not context or not message:
         return jsonify({'reply':"Faltan 'contexto' o 'message' en los datos"}), 400
     if context == "configuracion":
-        return jsonify({'reply': context})
+         return configuracion_chat(message)
     elif context == "vulnerabilidades":
        return jsonify({'reply': context})
     elif context == "historial":
         return jsonify({'reply': context})
     elif context == "general":
-        return jsonify({'reply': context})
+        return general_chat(message)
     else:
         return jsonify({"error": "Contexto desconocido"}), 400
+
+def configuracion_chat(message):
+    client = openai_client()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistento al que le van a pasar una configuracion y tu tienes que sacar solo la url, la fecha en formato Datetime y la intesidad, sacamelo en formato JSON sin ```json. solo el JSON"},
+                { "role": "user", "content": message}
+            ]
+        )
+        return jsonify({"reply": response.choices[0].message.content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def general_chat(message):
+    client = openai_client()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente al que le van a preguntar cualquier cosa y tienes que responder de la manera mas profesional posible"},
+                { "role": "user", "content": message}
+            ]
+        )
+        return jsonify({"reply": response.choices[0].message.content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def vulnerabilidades_chat(message):
+    client = openai_client()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente al que le van a preguntar cualquier cosa y tienes que responder de la manera mas profesional posible"},
+                { "role": "user", "content": message}
+            ]
+        )
+        return jsonify({"reply": response.choices[0].message.content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # @app.route('/chatget', methods=['POST'])
 # def chatget():
