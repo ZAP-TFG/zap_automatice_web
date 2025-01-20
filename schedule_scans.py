@@ -85,6 +85,7 @@ def execute_scan(scan_id):
                 is_in_sites(zap, scan.target_url)
                 active_scan(zap, scan.target_url, scan.intensidad)
                 scan.estado = 'COMPLETADO'
+                #send_email()
                 db.session.commit()
             else:
                 logger.warning(f"Escaneo con ID {scan_id} no encontrado.")

@@ -48,15 +48,26 @@ $(document).ready(function () {
 
     function sendContextBasedRequest(context, messagesDiv) {
         $.ajax({
-            url: '/respuesta_chatgpt', // Ruta para obtener la respuesta según el contexto
+            url: '/respuesta_chatgpt', 
             method: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify(context), // Enviamos el JSON completo
+            data: JSON.stringify(context), 
             success: function (response) {
-                // Mostrar la respuesta final del chatbot
+                console.log("Response:",response.reply);
+                if (!response.reply) {
+                    console.error("El servidor no devolvió una respuesta válida.");
+                    return;
+                }
+                var convert = new showdown.Converter();
+                var html = convert.makeHtml(response.reply || "Error en el servidor.")
+                console.log("HTML Content generado:", html);
+
+                // Construir el mensaje del bot
                 const botReply = `<div class="text-start mb-3">
-                    <span class="badge bg-secondary text-wrap">${response.reply || "Error en el servidor."}</span>
+                    <span class="badge bg-secondary text-wrap">${html}</span>
                 </div>`;
+
+                // Insertar en el DOM
                 messagesDiv.append(botReply);
                 messagesDiv.scrollTop(messagesDiv[0].scrollHeight);
             },

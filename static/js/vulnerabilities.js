@@ -85,7 +85,9 @@ $(document).ready(function() {
             data: { url: url },
             success: function(response) {
                 // Mostrar la comparativa en el contenedor
-                $('#chatgptResponse').html(response.comparativa);
+                var convert = new showdown.Converter();
+                var html = convert.makeHtml(response.comparativa)
+                $('#chatgptResponse').html(html);
             },
             error: function(xhr) {
                 $('#chatgptResponse').text("Error: " + (xhr.responseJSON.error || "No se pudo generar la comparativa."));

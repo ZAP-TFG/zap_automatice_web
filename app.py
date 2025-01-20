@@ -12,6 +12,7 @@ from sqlalchemy.inspection import inspect
 from sqlalchemy import text
 import logging
 from schedule_scans import *
+import threading
 
 # app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(32)
@@ -161,7 +162,7 @@ def obtener_comparativa_vulnerabilidades():
             completion = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB, donde te van a pasar dos reportes, el primero es el ultimo realizado y el segundo es el anterior. TU objetivo es comparalos y sacar las diferencias entre vulnerabilidades. Y si puedes buscar en internet como mejorarlo, el CVE, OWASP-TOP-10 al que pertenece...Tiene que ser bien estrcuturado y poder ser no muy extenso. En vez de markdown escribemelo en HTML y en español."},
+                    {"role": "system", "content": "Eres un asistente especializado en vulnerabilidades WEB, donde te van a pasar dos reportes, el primero es el ultimo realizado y el segundo es el anterior. TU objetivo es comparalos y sacar las diferencias entre vulnerabilidades. Y si puedes buscar en internet como mejorarlo, el CVE, OWASP-TOP-10 al que pertenece...Tiene que ser bien estrcuturado y poder ser no muy extenso. Escribelo en markdown bonito y que no haya interliniado entre parrafos ni frases y en español."},
                     {"role": "user", "content": json.dumps(report_new)},
                     {"role": "user", "content": json.dumps(report_old)}
                 ]
@@ -270,21 +271,58 @@ def interact_with_gpt_context():
         completion = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": """  Eres un asistente especializado en sacar el contexto de lo que te están pidiendo. Lo que saques tiene que ser en formato JSON. Te voy a poner ejemplos:
-                1. Cuando te pidan configurar o programar un escáner, el contexto será: configuracion
-                2. '¿Qué hay de nuevo respecto ayer?' o 'hay algun escaner nuevo' ... será: historial.
-                3. Cuando te pidan preguntas normales será: general.
-                4. Cuando te pidan datos sobre una url será: vulnerabilidades.
-                Posibles contextos: configuracion, vulnerabilidades, general, historial.
-                Por ultimo tienes que poner  { "contexto": "" , "message": ""} y en el message tienes que copiar y pegar el mensage del usuario"""},
+                {"role": "system", "content": """  
+                 #OBJETIVOS
+                 Eres un asistente especializado en sacar el contexto de lo que te están pidiendo y experto en ciberseguridad. La salida será un JSON.
+                 Tendrás que sacar un porcentaje de pertenencia a cada categoría.
+                 - configuracion: Cuando te pidan configurar o programar un escáner 
+                 - historial: ¿Qué hay de nuevo respecto ayer?' o 'hay algun escaner nuevo'
+                 - preguntas: Cuando te pidan preguntas de cualquier ámbito.
+                 - reportes: Cuando te pidan datos sobre una url.
+                 ### OUTPUT FORMATO DE SALIDA
+                 {"contexto": {'configuracion': Probabilidad de que pertenezca a la categoria configuracion,
+                  'historial': Probabilidad de que pertenezca a la categoria historial,  
+                 'preguntas': Probabilidad de que pertenezca a la categoria preguntas,
+                 'reportes': Probabilidad de que pertenezca a la categoria reportes} ,
+                  "message": "copiar y pegar el mensage del usuario"
+                 ##EJEMPLOS
+                 3.  (ejemplo: "Como solventarias la vulenrabilidad de falta de token anti-CRSF", "que tiempo hace hoy", "dame los reportes del banco mundial", "como solvento la vulnerabilidad 'x' de esta url."): preguntas.
+                4. Cuando te pidan datos sobre una url será: reportes.
+                Posibles contextos: configuracion, reportes, preguntas, historial.
+                - input del usuario: Como solventarias la vulenrabilidad de falta de token anti-CRSF
+                 respuesta:{"contexto": {'configuracion':0,
+                  'historial':0,  
+                 'preguntas':1,
+                 'reportes':0} ,
+                  "message": 'Como solventarias la vulenrabilidad de falta de token anti-CRSF'
+                 }
+                - input del usuario: Que hay de nuevo respecto ayer
+                 respuesta:{"contexto": {'configuracion':0,
+                  'historial':1,  
+                 'preguntas':0,
+                 'reportes':0} ,
+                  "message": 'Que hay de nuevo respecto ayer'
+                 }
+                - input del usuario: dame las ultimas vulnerabilidades de http://example.com
+                 respuesta:{"contexto": {'configuracion':0,
+                  'historial':0,  
+                 'preguntas':0,
+                 'reportes':1} ,
+                  "message": 'http://example.com'(solo quiero la URL)
+                 }
+                - input del usuario: programame un escaner para http://example.com con intesidad media para el 17 de enero de 2025 a las 12pm
+                 respuesta:{"contexto": {'configuracion':1,
+                  'historial':0,  
+                 'preguntas':0,
+                 'reportes':0} ,
+                  "message": 'programame un escaner para http://example.com con intesidad media para el 17 de enero de 2025 a las 12pm'
+                """},
                 {
                     "role": "user",
                     "content": prompt
                 }
             ]
         )
-
-        # Retornar el contexto obtenido por GPT
         return jsonify({'reply': completion.choices[0].message.content})
 
     except Exception as e:
@@ -299,16 +337,25 @@ def respuesta_chatgpt():
     message = data.get('message')
     if not context or not message:
         return jsonify({'reply':"Faltan 'contexto' o 'message' en los datos"}), 400
-    if context == "configuracion":
+    if float(context.get('configuracion')) > 0.7:
          return configuracion_chat(message)
-    elif context == "vulnerabilidades":
-       return jsonify({'reply': context})
-    elif context == "historial":
+    elif float(context.get('reportes')) > 0.7:
+       return vulnerabilidades_chat(message)
+    elif float(context.get('historial')) > 0.7:
         return jsonify({'reply': context})
-    elif context == "general":
+    elif float(context.get('preguntas')) > 0.7:
         return general_chat(message)
     else:
         return jsonify({"error": "Contexto desconocido"}), 400
+
+##########################################################################################
+def lanzar_escaneo(url,intensidad):
+    with app.app_context():
+        zap = connection_to_zap()
+        is_in_sites(zap, url)
+        scan_id = active_scan(zap, url, intensidad)
+        email = 'gabriel.izquierdo.gonzalez@gmail.com'
+        send_email(zap,url,email)
 
 def configuracion_chat(message):
     client = openai_client()
@@ -316,15 +363,29 @@ def configuracion_chat(message):
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistento al que le van a pasar una configuracion y tu tienes que sacar solo la url, la fecha en formato Datetime y la intesidad, sacamelo en formato JSON sin ```json. solo el JSON"},
+                {"role": "system", "content": "Eres un asistento al que le van a pasar una configuracion y tu tienes que sacar solo la url, la fecha en formato Datetime y la intesidad(en ingles). Cuando te digan que el escaner lo quieres para ahora tiene que poner en fecha: now. sacamelo en formato JSON sin ```json. solo el JSON"},
                 { "role": "user", "content": message}
             ]
         )
-        return jsonify({"reply": response.choices[0].message.content})
+        print(response.choices[0].message.content)
+        data = json.loads(response.choices[0].message.content)
+        url = data['url']
+        intensidad = data['intensidad']
+        fecha = data['fecha']
+
+        print(url,intensidad,fecha)
+        if fecha == 'now':
+            try:
+                thread = threading.Thread(target=lanzar_escaneo, args=(url,intensidad))
+                thread.start()
+                return jsonify({"reply": "Escaneo lanzado correctamente, seras notificado por email"})
+            except Exception as error:
+                return jsonify({"reply": "El escaneo no se lanzo correctamente pruebe otra vez"})
+        #return jsonify({"reply": response.choices[0].message.content})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
+############################################################################33
 def general_chat(message):
     client = openai_client()
     try:
@@ -342,12 +403,22 @@ def general_chat(message):
 
 def vulnerabilidades_chat(message):
     client = openai_client()
+    query = Reportes_vulnerabilidades_url.query.filter_by(target_url=message).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).first()
+    report = json.dumps(query.report_file)
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistente al que le van a preguntar cualquier cosa y tienes que responder de la manera mas profesional posible"},
-                { "role": "user", "content": message}
+                {"role": "system", "content": """##### OBJETIVOS
+                                                        Eres un asistetne especilizado en ciberseguridad. Al que le van a pasar un reporte en formato JSON de una url 
+                                                        y vas a tener que decir las vulnerabilidades que tiene y su creticidad.No quiero descricciones. Sacme el resultado en formato markdown.
+                                                #### EJEMPLO en markdown:
+                                                    '''
+                                                    ###Vulenrabilidades
+                                                  - Missing Anti-Clickjacking Header -> MEDIA
+                                                  - Content Security Policy (CSP) Header Not Set -> MEDIA'''
+                                                """},
+                { "role": "user", "content": report}
             ]
         )
         return jsonify({"reply": response.choices[0].message.content})
