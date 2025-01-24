@@ -32,10 +32,10 @@ class Reportes_vulnerabilidades_url(db.Model):
     
     id =  id = db.Column(db.Integer, primary_key=True)
     target_url = db.Column(db.String(200), nullable=False)
-    vul_altas = db.Column(db.Integer, default=0, nullable=False)
-    vul_medias = db.Column(db.Integer, default=0, nullable=False)
-    vul_bajas = db.Column(db.Integer, default=0, nullable=False)
-    vul_info = db.Column(db.Integer, default=0, nullable=False)
+    vul_altas = db.Column(JSON, nullable=True)
+    vul_medias = db.Column(JSON, nullable=True)
+    vul_bajas = db.Column(JSON, nullable=True)
+    vul_info = db.Column(JSON, nullable=True)
     fecha_scan = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     report_file = db.Column(JSON, nullable=True)
 

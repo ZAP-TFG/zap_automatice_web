@@ -13,6 +13,7 @@ from sqlalchemy import text
 import logging
 from schedule_scans import *
 import threading
+import tiktoken ## contar tokens
 
 # app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(32)
@@ -255,6 +256,10 @@ def chatbot():
     form = ChatForm()
     return render_template("chatbot.html", form=form)
 
+
+# variables globales
+PROMT = None
+
 @app.route('/context_chatgpt', methods=['POST'])
 def interact_with_gpt_context():
     data = request.get_json()  # Obtienes los datos del JSON enviado en la solicitud POST
@@ -329,6 +334,14 @@ def interact_with_gpt_context():
         logging.error(f"Error al interactuar con el LLM: {str(e)}")
         return jsonify({'error': 'Hubo un problema al procesar la solicitud.'}), 500
 
+
+def count_tokens(promt):
+    Model = "gpt-3.5-turbo"
+    tokenizer = tiktoken.encoding_for_model(Model)
+    tokens = tokenizer.encode(promt)
+    return len(tokens)
+
+
 @app.route('/respuesta_chatgpt', methods=['POST'])
 def respuesta_chatgpt():
     data = request.get_json()
@@ -338,7 +351,7 @@ def respuesta_chatgpt():
     if not context or not message:
         return jsonify({'reply':"Faltan 'contexto' o 'message' en los datos"}), 400
     if float(context.get('configuracion')) > 0.7:
-         return configuracion_chat(message)
+        return configuracion_chat(message)
     elif float(context.get('reportes')) > 0.7:
        return vulnerabilidades_chat(message)
     elif float(context.get('historial')) > 0.7:
@@ -396,6 +409,7 @@ def general_chat(message):
                 { "role": "user", "content": message}
             ]
         )
+        PROMT = PROMT + response.choices[0].message.content
         return jsonify({"reply": response.choices[0].message.content})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -421,6 +435,7 @@ def vulnerabilidades_chat(message):
                 { "role": "user", "content": report}
             ]
         )
+        PROMT = PROMT + response.choices[0].message.content
         return jsonify({"reply": response.choices[0].message.content})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
