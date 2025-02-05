@@ -13,7 +13,7 @@ class Escaneres_completados(db.Model):
     intensidad = db.Column(db.String(50), nullable=False, default='DEFAULT')
     api_scan = db.Column(db.Boolean, default = False)
     api_file = db.Column(JSON,nullable=True)
-    report_file = db.Column(JSON, nullable=True) # recoger alertas que umbral medio/alto
+    #report_file = db.Column(JSON, nullable=True) # recoger alertas que umbral medio/alto
 
 
 class Vulnerabilidades_totales(db.Model):
@@ -40,7 +40,7 @@ class Reportes_vulnerabilidades_url(db.Model):
     report_file = db.Column(JSON, nullable=True)
 
 class Escaneo_programados(db.Model):
-    __tablename__= 'escaneos_progrmados'
+    __tablename__= 'escaneos_programados'
 
     id = db.Column(db.Integer, primary_key=True)
     target_url = db.Column(db.String(200), nullable=False)

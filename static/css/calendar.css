@@ -1,0 +1,14 @@
+#calendar {
+    max-width: 80%;
+    margin: 0 auto; 
+    height: 850px; 
+}
+.modal-header{
+    background-color: #f8f9fa; 
+    color: #000000; 
+    border-bottom: 1px solid #ddd;
+}
+.modal-body{
+    background-color: #f8f9fa; 
+    color: #000000;
+}

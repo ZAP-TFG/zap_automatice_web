@@ -52,12 +52,12 @@ def openai_client():
 def interact_with_gpt_context(client,prompt):
     try:
         completion = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": """  
+                {"role": "system", "content":  """  
                  #OBJETIVOS
                  Eres un asistente especializado en sacar el contexto de lo que te están pidiendo y experto en ciberseguridad. La salida será un JSON.
-                 Tendrás que sacar un porcentaje de pertenencia a cada categoría.
+                 Tendrás que sacar un porcentaje de pertenencia a cada categoría
                  - configuracion: Cuando te pidan configurar o programar un escáner 
                  - historial: ¿Qué hay de nuevo respecto ayer?' o 'hay algun escaner nuevo'.
                  - preguntas: Cuando te pidan preguntas de cualquier ámbito.
@@ -159,7 +159,7 @@ def interact_with_gpt_context(client,prompt):
                     "content": prompt
                 }
             ],
-            temperature=0.2
+            temperature=0.1
         )
         return(completion.choices[0].message.content)
     except Exception as e:
@@ -168,11 +168,11 @@ def interact_with_gpt_context(client,prompt):
 def preguntas(client, prompt):
     try:
         completion = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": """  
                 #####OBJETIVOS
-                 Eres un asistente especializado en el area de ciberseguridad y hacking. Te haran preguntas y tendras que responder la manera mas clara 
+                 Eres un asistente especializado en el area de ciberseguridad. Te haran preguntas y tendras que responder la manera mas clara 
                  y precisa posible. La salida sera en formato markdown.
                 """},
                 {
@@ -186,11 +186,67 @@ def preguntas(client, prompt):
     except Exception as e:
         logging.error(f"Error en la consulta preguntas al GPT: {e}")
 
+def comparacion (client, prompt, message):
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": """  
+                Rol: Eres un experto en ciberseguridad. Se te proporcionarán entre 2 y 4 reportes de vulnerabilidades. Cada reporte incluye la siguiente información:
+                Listado de vulnerabilidades detectadas (por ejemplo, nombre, descripción o CWE).
+                Fecha de generación o versión.
+                Objetivo:
+                Comparar los reportes, identificando las diferencias clave en cuanto a vulnerabilidades.
+                Listar exclusivamente las vulnerabilidades de cada reporte (sin repeticiones innecesarias).
+                Resaltar cualquier mejora o reducción de vulnerabilidades encontradas entre cada reporte.
+                Todo debe presentarse en formato Markdown.
+                Destaca las vulnerabilidades que se repiten en más de un reporte (si aplica).
+                Observa si alguna vulnerabilidad se resolvió o ya no aparece en un reporte posterior.
+                Enfatizar las mejoras
+                Si la vulnerabilidad “X” estaba presente en el Reporte 1 pero ya no aparece en el Reporte 2 (o 3, 4…), indícalo para mostrar una posible mejora.
+                Menciona explícitamente dónde se nota corregida o ausente.
+                Formato de salida
+                Usa Markdown para estructurar tu respuesta.
+                Separa el contenido en secciones descriptivas (por ejemplo, “Vulnerabilidades encontradas por reporte”, “Diferencias clave”, “Mejoras detectadas”).
+                Emplea viñetas, listas numeradas o tablas en caso de que sea útil para clarificar la información.
+                Ejemplo de respuesta esperada (en Markdown)
+                text
+                # Comparativa de Reportes de Vulnerabilidades
+
+                ## Reporte 1 (Fecha: 2023-10-01)
+                - **SQL Injection** (CWE-89)
+                - **Broken Access Control** (CWE-200)
+
+                ## Reporte 2 (Fecha: 2023-10-15)
+                - **Broken Access Control** (CWE-200)
+                - **Cross-Site Scripting (XSS)** (CWE-79)
+
+                ## Diferencias clave
+                - **Novedad en Reporte 2**: Cross-Site Scripting (XSS) no existía en Reporte 1.  
+                - **Ausencia**: SQL Injection ya no aparece en Reporte 2, lo que indica una posible corrección.
+
+                ## Mejoras detectadas
+                - Al eliminar la vulnerabilidad “SQL Injection”, se demuestra que se corrigió o mitigó en la transición del Reporte 1 al Reporte 2.
+                """},
+                {
+                    "role": "user",
+                    "content": prompt
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ],
+            temperature=0.8
+        )
+        print(completion.choices[0].message.content)
+    except Exception as e:
+        logging.error(f"Error en comparacion del GPT: {e}")
 
 def vulnerabilidades_2(client, prompt1, message):
     try:
         completion = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": """  
                 Rol: Eres un experto en ciberseguridad. Se te proporcionarán vulnerabilidades detectadas, las URLs en las que se han encontrado, el CWE correspondiente y la categoría OWASP Top 10 aplicable. Dependiendo de la petición del usuario, deberás:
@@ -268,26 +324,13 @@ def vulnerabilidades_2(client, prompt1, message):
         )
         print(completion.choices[0].message.content)
     except Exception as e:
-        logging.error(f"Error en la consulta historial al GPT: {e}")
+        logging.error(f"Error en vulnerbilidades_2 del GPT: {e}")
 
-def consultas_generales(client, message, escenario):
+def consultas_generales(client, message):
     now = datetime.now()
-    if escenario == 'historial':
-        tabla = 'escaneos_progrmados'
-    elif escenario in ['reportes','vulnerabilidades','comparacion']:
-        tabla = 'reportes_vulnerabilidades_url'
-    with app.app_context():
-        try: 
-            inspector = inspect(db.engine)
-            columnas = inspector.get_columns(tabla)
-            for column in columnas:
-                print(column)
-        except Exception as e:
-            logging.error(f"Error 1 al tratar de sacar esquema de la BBDD {e}")
-
     try:
         completion = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": f"""  
                 Eres un experto en generación de sentencias SQL. Te entrego la siguiente información sobre la base de datos (SQLite) y,
@@ -335,6 +378,14 @@ def consultas_generales(client, message, escenario):
                             WHERE target_url = 'http://example.com'
                             ORDER BY fecha_scan DESC
                             LIMIT 2;
+                    -  hazme un resumen del ultimo reporte de http://example.com
+                        Esta petición requiere consultar la tabla reportes_vulnerabilidades_url y extraer únicamente los dos reportes más recientes relacionados con target_url = 'http://example.com', devolviendo, por ejemplo, los campos del reporte (en concreto report_file si fuera necesario).
+                        Ejemplo de respuesta (solo SQL):
+                            SELECT report_file
+                            FROM reportes_vulnerabilidades_url
+                            WHERE target_url = 'http://example.com'
+                            ORDER BY fecha_scan DESC
+                            LIMIT 1;
                     -  Qué vulnerabilidades tiene la url http://example.com
                         El objetivo es filtrar por vul_altas, vul_medias, vul_bajas, etc., sacando la información del último escaneo (ordenado por fecha_scan descendente y tomando el primero).
                         Ejemplo de respuesta (solo SQL):
@@ -354,10 +405,10 @@ def consultas_generales(client, message, escenario):
                             OR vul_bajas LIKE '%XSS%'
                             OR vul_info LIKE '%XSS%');
                     -  Qué escáneres hay programados para hoy
-                        Se debe consultar la tabla escaneos_progrmados y filtrar por la fecha que coincida con el día actual.
+                        Se debe consultar la tabla escaneos_programados y filtrar por la fecha que coincida con el día actual.
                         Ejemplo de respuesta (solo SQL): 
                             SELECT *
-                            FROM escaneos_progrmados
+                            FROM escaneos_programados
                             WHERE DATE(fecha_programada) = DATE('now');
                     - Qué hay de nuevo respecto a ayer
                         Consultar la tabla escaneos_completados para ver si se ejecutó algún escáner hoy o si se ejecutó alguno respecto a ayer. Aquí podríamos comparar la fecha fecha_fin con la de ayer.
@@ -391,37 +442,36 @@ if __name__ == '__main__':
             elif float(contexto['comparacion']) > 0.7:
                 escenario = 'comparacion'
                 print(message)
-                consultas_generales(client, message, escenario)
+                time.sleep(0.5)
+                response = consultas_generales(client, message)
+                query = text(response)
+                print(query)
+                pdb.set_trace()
+                result = db.session.execute(query).fetchall()
+                print(result)
+                consulta_bbdd = [dict(row._mapping) for row in result]
+                json_data = json.dumps(consulta_bbdd, indent=4)
+                print(json_data)
+                pdb.set_trace()
+                comparacion(client,json_data,message)
+                
             elif float(contexto['vulnerabilidades']) > 0.7:
                 escenario = 'vulnerabilidades'
                 consultas_generales(client, message, escenario)
             elif float(contexto['reportes']) > 0.7:
                 escenario = 'reportes'
                 time.sleep(0.5)
-
-                # Llamada a tu función de consultas
-                response = consultas_generales(client, message, escenario)
+                response = consultas_generales(client, message)
                 query = text(response)
-
                 print("Query generado:", query)
                 pdb.set_trace()
-
-                # Ejecutamos la consulta
                 result = db.session.execute(query).fetchall()
                 print("Resultados crudos de la BD:", result)
-
-                # Conviertes cada fila (Row) en diccionario
-                # row._mapping funciona en SQLAlchemy 1.4+ y te devuelve un mapeo tipo dict
                 consulta_bbdd = [dict(row._mapping) for row in result]
-
-                # Serializamos a JSON para debug o uso posterior
                 json_data = json.dumps(consulta_bbdd, indent=4)
                 print("Resultados en formato JSON:")
                 print(json_data)
-
                 pdb.set_trace()
-
-                # Llamada a tu función que procesa las vulnerabilidades
                 vulnerabilidades_2(client, json_data, message)
 
             elif float(contexto['historial']) > 0.7:
