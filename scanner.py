@@ -206,6 +206,7 @@ def active_scan(zap,url,strength):
 
 
 
+
 def send_email(zap,url,email):
 #####################################################################################
 #####                       REPORTAR ALERTAS ALTAS Y MEDIAS               ###########
