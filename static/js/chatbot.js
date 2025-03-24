@@ -1,57 +1,32 @@
 $(document).ready(function () {
-    // Al hacer clic en el botón de enviar
+    
     $('#send-button').click(function () {
         sendMessage();
     });
 
-    // Al presionar "Enter" en el input
     $('#user-input').keypress(function (event) {
         if (event.key === "Enter") {
+            event.preventDefault(); 
             sendMessage();
         }
     });
 
     function sendMessage() {
         const userInput = $('#user-input').val().trim();
-        if (!userInput) return; // Si no hay input, no hace nada
+        if (!userInput) return; 
 
         const messagesDiv = $('#messages');
 
-        // Mostrar el mensaje del usuario
-        const userMessage = `<div class="text-end mb-3">
-            <span class="badge bg-primary text-wrap">${userInput}</span>
-        </div>`;
-        messagesDiv.append(userMessage);
+        // Muestra el mensaje del usuario en la interfaz
+        messagesDiv.append(`<div class="text-end mb-3"><span class="badge bg-primary">${userInput}</span></div>`);
         messagesDiv.scrollTop(messagesDiv[0].scrollHeight);
 
-        // Llamada al primer endpoint para obtener el contexto
+        // Enviar petición AJAX al backend
         $.ajax({
             url: '/context_chatgpt',
             method: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({ message: userInput }),
-            success: function (response) {
-                console.log("Respuesta de /context_chatgpt:", response);
-                const context = JSON.parse(response.reply); // Asumimos que es JSON
-
-                // Enviar el contexto al segundo endpoint
-                sendContextBasedRequest(context, messagesDiv);
-            },
-            error: function (xhr, status, error) {
-                console.error("Error al obtener el contexto:", error);
-            }
-        });
-
-        // Limpiar el campo de texto
-        $('#user-input').val('');
-    }
-
-    function sendContextBasedRequest(context, messagesDiv) {
-        $.ajax({
-            url: '/respuesta_chatgpt', 
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(context), 
             success: function (response) {
                 console.log("Response:",response.reply);
                 if (!response.reply) {
@@ -69,11 +44,18 @@ $(document).ready(function () {
 
                 // Insertar en el DOM
                 messagesDiv.append(botReply);
-                messagesDiv.scrollTop(messagesDiv[0].scrollHeight);
+                messagesDiv.scrollTop(messagesDiv[0].scrollHeight)
             },
-            error: function (error) {
-                console.error("Error al obtener la respuesta según el contexto:", error);
+            error: function (xhr, status, error) {
+                console.error("Error en la petición AJAX:", error);
             }
         });
+
+        // Limpiar input del usuario
+        $('#user-input').val('');
+    }
+
+    function formatReply(reply) {
+        return reply.replace(/\n/g, '<br>'); // Reemplazar \n con etiquetas <br> para mostrar saltos de línea en HTML
     }
 });

@@ -7,3 +7,6 @@ zap_logs.log
 /instance
 jobs.db
 zap_data_base.db
+/consulas_sql.py
+comentarios.md
+pruebas.py 

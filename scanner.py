@@ -12,6 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+from generate_report import generar_reporte_custom
 
 #variable global
 SCANER_ID = None
@@ -29,7 +30,7 @@ load_dotenv()
 
 def connection_to_zap():
     try:
-        zap = ZAPv2(apikey=os.getenv("ZAP_API_KEY"), proxies={'http': 'http://localhost:8081'})#
+        zap = ZAPv2(apikey=os.getenv("ZAP_API_KEY"), proxies={'http': 'http://localhost:8090'})#
         logging.info(zap.core.version)
         return zap
     except Exception as error:
@@ -78,7 +79,7 @@ def scan_strength(zap,strength):
 
 def get_report(zap, url):
     try:
-        reportdir = '/tmp'
+        reportdir = r'C:\Users\gizquierdog\reportes_app_zap_python'
         reportfilename = 'Reporte_vulnerabilidades'
         filepath = os.path.join(reportdir, f"{reportfilename}.json")
         zap.reports.generate(
@@ -211,12 +212,7 @@ def send_email(zap,url,email):
 #####################################################################################
 #####                       REPORTAR ALERTAS ALTAS Y MEDIAS               ###########
 #####################################################################################
-    # status = 0
-    # while True:
-    #     status = zap.ascan.status(SCANER_ID)
-    #     if status == 100:
-    #         break
-    # if status == 100:
+   
     alerts_high = set() 
     alerts_medium = set()  
     alerts_low = set()
@@ -235,20 +231,15 @@ def send_email(zap,url,email):
             alerts_medium.add(alert_name)
         elif alert_risk == 'Low':
             alerts_low.add(alert_name)
-    #####################################################################################
-    #####                             GENERAR REPORTE                         ###########
-    #####################################################################################
-    report_path = '/tmp'
-    reporte = zap.reports.generate(
-        title='reporte_vulnerabilidades',
-        template='traditional-pdf',  
-        sites=url,               
-        reportdir=report_path,
-        reportfilename='reporte_vulnerabilidades' 
-    )
+    
+    ##############################################
+    docx_path = generar_reporte_custom(target_url=url)
 
+    if not os.path.exists(docx_path):
+        print(f"Error: No se encontró el documento {docx_path}.")
+        return
     #####################################################################################
-    #####                   MANDAR CORREO UNA VEZ FINALIZADO                  ###########
+    #####                   MANDAR CORREO con DOXC Finalizado                  ###########
     #####################################################################################
 
     # Función para enviar el correo usando SendGrid
@@ -311,13 +302,13 @@ def send_email(zap,url,email):
     msg['Subject'] = f"Escáner finalizado para la URL: {url}"
     msg.attach(MIMEText(email_content, 'html'))
 
-    path_pdf = os.path.join(report_path, "reporte_vulnerabilidades.pdf")
+    #path_pdf = os.path.join(report_path, "reporte_vulnerabilidades.pdf")
     # Abrir el archivo PDF generado y adjuntarlo
-    with open(path_pdf, "rb") as attachment:
+    with open(docx_path, "rb") as attachment:
         part = MIMEBase('application', 'octet-stream')
         part.set_payload(attachment.read())
         encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f"attachment; filename={os.path.basename(path_pdf)}")
+        part.add_header('Content-Disposition', f"attachment; filename={os.path.basename(docx_path)}")
         msg.attach(part)
 
 
@@ -340,9 +331,9 @@ def send_email(zap,url,email):
         ],
         "attachments": [
             {
-                "content": base64.b64encode(open(path_pdf, "rb").read()).decode(),
+                "content": base64.b64encode(open(docx_path, "rb").read()).decode(),
                 "type": "application/pdf",
-                "filename": os.path.basename(path_pdf)
+                "filename": os.path.basename(docx_path)
             }
         ]
     }
