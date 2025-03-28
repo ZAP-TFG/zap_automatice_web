@@ -21,7 +21,7 @@ ZAP_API_KEY = os.getenv("ZAP_API_KEY")
 ZAP_URL = os.getenv("ZAP_URL")
 zap_url = ZAP_URL
 
-doc = Document(r"C:\Users\gizquierdog\Documents\custom_report\custom_report.docx")
+doc = Document('/home/kalilinux22/Documents/Gabri/custom_report/custom_report.docx')
 
 def connect_zap():
     try:
@@ -106,7 +106,7 @@ def grafica_barras(vul_altas, vul_medias, vul_bajas, vul_informativas):
 
     plt.legend(loc='lower center', bbox_to_anchor=(0.5, -1.25), ncol=len(legend_labels), fontsize=30)
 
-    image_path = r"C:\Users\gizquierdog\Documents\custom_report\grafica_vulnerabilidades.png"
+    image_path = '/home/kalilinux22/Documents/Gabri/custom_report/grafica_vulnerabilidades.png'
 
     # Guardar la gráfica como imagen
     plt.tight_layout()
@@ -313,7 +313,7 @@ def agregar_tablas_vulnerabilidades(doc,n):
         tabla_original._element.addnext(salto_pagina)  
         salto_pagina.addnext(nueva_tabla) 
         
-    doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
+    doc.save('/home/kalilinux22/Documents/Gabri/custom_report/custom_report_modificado.docx')
 def contexto_resumen_ejecutivo(url, alertas_set, target_url):
     datos_json = alertas_set
     time.sleep(1)
@@ -369,8 +369,8 @@ def generar_reporte_custom(target_url):
     contexto_resumen_ejecutivo(target_url, alertas_set, target_url)
     imagen_path = grafica_barras(len(high_set), len(medium_set), len(low_set), len(informational_set))
     insertar_imagen_en_celda(doc, imagen_path, tabla_index=5, fila=1, columna=0)
-    doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
+    doc.save('/home/kalilinux22/Documents/Gabri/custom_report/custom_report_modificado.docx')
     print("✅ Documento generado correctamente con gráfica insertada.")
-    doc_path = r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx"
+    doc_path = '/home/kalilinux22/Documents/Gabri/custom_report/custom_report_modificado.docx'
     return doc_path
 
