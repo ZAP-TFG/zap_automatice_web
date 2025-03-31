@@ -30,7 +30,7 @@ logging.basicConfig(
 
 # Configuración de la aplicación
 app.config['SECRET_KEY'] = os.urandom(32)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zap_data_base.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zap_data_base.db?journal_mode=WAL&timeout=30'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configuración de CORS (restringido a dominios específicos)
@@ -52,7 +52,7 @@ def init_scheduler_scans():
 def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Content-Security-Policy'] = "default-src * 'unsafe-inline' 'unsafe-eval';"
+    response.headers['Content-Security-Policy'] = "default-src * data: blob: filesystem: 'unsafe-inline' 'unsafe-eval'; img-src * data: blob:;"
     response.headers['X-XSS-Protection'] = '1; mode=block'
     return response
 
@@ -117,7 +117,7 @@ def get_calendar_events():
             ).first()
 
             events.append({
-                "title": f"Completed: {scan.target_url}",
+                "title": f"{scan.target_url}",
                 "start": scan.fecha_inicio.strftime('%Y-%m-%d'),
                 "end": scan.fecha_fin.strftime('%Y-%m-%d'),
                 "backgroundColor": "#28a745",
@@ -135,7 +135,7 @@ def get_calendar_events():
         scheduled_scans = Escaneo_programados.query.filter(Escaneo_programados.fecha_programada >= today).all()
         for scan in scheduled_scans:
             events.append({
-                "title": f"Scheduled: {scan.target_url}",
+                "title": f"{scan.target_url}",
                 "start": scan.fecha_programada.strftime('%Y-%m-%d'),
                 "end": scan.fecha_programada.strftime('%Y-%m-%d'),
                 "backgroundColor": "#ffc107",
@@ -164,8 +164,8 @@ def process_scan():
         email = request.form.get('email')
         scheduled = request.form.get('scheduled', 'false').lower() == 'true'
         dateTime = request.form.get('dateTime')
-        apiScan = request.form.get('apiScan', 'false').lower() == 'true'
-        configFile = request.files.get('file')
+        #apiScan = request.form.get('apiScan', 'false').lower() == 'true'
+        #configFile = request.files.get('file')
 
         # Validar datos obligatorios
         if not url or not intensity:
@@ -173,12 +173,12 @@ def process_scan():
 
         # Procesar archivo de configuración si existe
         config_data = None
-        if configFile:
-            try:
-                config_data = json.loads(configFile.read().decode('utf-8'))
-            except Exception as e:
-                logging.error(f"Error al procesar el archivo de configuración: {e}")
-                return jsonify({'status': 'error', 'message': 'Archivo de configuración inválido.'}), 400
+        # if configFile:
+        #     try:
+        #         config_data = json.loads(configFile.read().decode('utf-8'))
+        #     except Exception as e:
+        #         logging.error(f"Error al procesar el archivo de configuración: {e}")
+        #         return jsonify({'status': 'error', 'message': 'Archivo de configuración inválido.'}), 400
 
         # Escaneo programado
         if scheduled:
@@ -191,8 +191,9 @@ def process_scan():
                     intensidad=intensity,
                     fecha_programada=dateTime_programed,
                     estado="PENDIENTE",
-                    api_scan=apiScan,
-                    api_file=config_data
+                    email=email,
+                    #api_scan=apiScan,
+                    #api_file=config_data
                 )
                 db.session.add(escaneo_programado)
                 db.session.commit()

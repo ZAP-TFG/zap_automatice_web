@@ -21,7 +21,7 @@ ZAP_API_KEY = os.getenv("ZAP_API_KEY")
 ZAP_URL = os.getenv("ZAP_URL")
 zap_url = ZAP_URL
 
-doc = Document('/home/kalilinux22/Documents/Gabri/custom_report/custom_report.docx')
+doc = Document(r"C:\Users\gizquierdog\Documents\custom_report\custom_report.docx")
 
 def connect_zap():
     try:
@@ -53,7 +53,8 @@ def remplazar_encabezado(doc, remplazos):
                             cell.text = cell.text.replace(marcador, valor)
                             for paragraph in cell.paragraphs:
                                 paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-
+                                for run in paragraph.runs:
+                                    run.font.color.rgb = RGBColor(255, 255, 255) 
 
 def modificar_primer_tabla(doc, remplazos):
     tabla = doc.tables[0]  
@@ -106,7 +107,7 @@ def grafica_barras(vul_altas, vul_medias, vul_bajas, vul_informativas):
 
     plt.legend(loc='lower center', bbox_to_anchor=(0.5, -1.25), ncol=len(legend_labels), fontsize=30)
 
-    image_path = '/home/kalilinux22/Documents/Gabri/custom_report/grafica_vulnerabilidades.png'
+    image_path = (r"C:\Users\gizquierdog\Documents\custom_report\grafica_vulnerabilidades.png")
 
     # Guardar la gráfica como imagen
     plt.tight_layout()
@@ -225,6 +226,12 @@ def get_alertas(url):
     zap = connect_zap()
     alerts = zap.alert.alerts(url)
     risk_order = {"High": 1, "Medium": 2, "Low": 3, "Informational": 4}
+    risk_translation = {
+    "High": "Alto",
+    "Medium": "Medio",
+    "Low": "Bajo",
+    "Informational": "Informativo"
+    }
     alerts_sorted = sorted(alerts, key=lambda x: risk_order.get(x.get('risk', 'Informational'), 4))
     alertas_set = set()
     alertas_high_set = set()
@@ -250,6 +257,7 @@ def get_alertas(url):
         
         alertas_set.add(alert_name)
         alert_risk = alert.get('risk')
+        alert_risk_spanish = risk_translation.get(alert_risk, alert_risk)
         alertas_filtradas = [alerta for alerta in alerts if alerta['alert'] == alert_name]
         alert_count = len(alertas_filtradas)
         alert_desc = alert.get('desc')
@@ -260,8 +268,8 @@ def get_alertas(url):
         alertas_info.append({
             'numero': f"{cont:02d}",
             'alert_name': alert_name,
-            'risk': alert_risk,
-            'owasp': datos['owasp'],  # Puedes ajustar esto según necesites
+            'risk': alert_risk_spanish,
+            'owasp': datos['owasp'], 
             'cwe': alert_cwe,
             'url': url,
             'detalles': datos['detalles'],
@@ -269,8 +277,8 @@ def get_alertas(url):
             'solucion': datos['solucion'],
             'referencias':alert_references
         })
+        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos['owasp'], alert_risk_spanish, "Detectada"]
         cont += 1
-        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos['owasp'], alert_risk, "Detectada"]
         agregar_alerta_tabla_6(doc, datos_alerta)
     agregar_tablas_vulnerabilidades(doc,len(alertas_set))
     tabla_index = 8
@@ -313,7 +321,7 @@ def agregar_tablas_vulnerabilidades(doc,n):
         tabla_original._element.addnext(salto_pagina)  
         salto_pagina.addnext(nueva_tabla) 
         
-    doc.save('/home/kalilinux22/Documents/Gabri/custom_report/custom_report_modificado.docx')
+    doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
 def contexto_resumen_ejecutivo(url, alertas_set, target_url):
     datos_json = alertas_set
     time.sleep(1)
@@ -369,8 +377,8 @@ def generar_reporte_custom(target_url):
     contexto_resumen_ejecutivo(target_url, alertas_set, target_url)
     imagen_path = grafica_barras(len(high_set), len(medium_set), len(low_set), len(informational_set))
     insertar_imagen_en_celda(doc, imagen_path, tabla_index=5, fila=1, columna=0)
-    doc.save('/home/kalilinux22/Documents/Gabri/custom_report/custom_report_modificado.docx')
+    doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
     print("✅ Documento generado correctamente con gráfica insertada.")
-    doc_path = '/home/kalilinux22/Documents/Gabri/custom_report/custom_report_modificado.docx'
+    doc_path = (r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
     return doc_path
 

@@ -1,0 +1,40 @@
+
+services:
+  zap:
+    image: owasp/zap2docker-stable
+    container_name: zap
+    networks:
+      - internal
+    environment:
+      - ZAP_API_KEY=dpmrvf282ecssm6rlb4mjci5et  # Asegúrate de reemplazar con un API key si es necesario
+    ports:
+      - "8080:8080"  # Si deseas exponer ZAP a puertos locales
+    entrypoint: ["zap.sh", "-daemon", "-port", "8080", "-host", "0.0.0.0"]
+    volumes:
+      - zap-data:/zap/wrk/
+      - ./instances:/zap/instances  # Montamos la carpeta instances para que ZAP pueda acceder a la base de datos
+
+  app:
+    build: .
+    container_name: flask_app
+    networks:
+      - internal
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+    volumes:
+      - .:/app
+      - ./jobs.db:/app/jobs.db  # Montamos la base de datos jobs.db para la app Flask
+    depends_on:
+      - zap
+    ports:
+      - "5000:5000"  # Exponer el puerto de Flask hacia el exterior
+    command: ["gunicorn", "-b", "0.0.0.0:5000", "app:app"]
+
+volumes:
+  zap-data:
+    driver: local
+
+networks:
+  internal:
+    driver: bridge

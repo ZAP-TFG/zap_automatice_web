@@ -157,7 +157,7 @@ def resumenes_comparacion(user_input: str) -> str:
     prompt_text = f"""
         Eres un asistente especializado en consultas SQL. Te voy a pasar un ejemplo de como tiene que ser la consulta y la estructura de mi tabla y vas a tener que responder con el formato string solo la consulta sin COMILLAS. 
         Ejemplo:   
-            SELECT report_file FROM reportes_vulnerabilidades_url WHERE target_url='https://example.com/' LIMIT 1
+            SELECT report_file FROM reportes_vulnerabilidades_url WHERE target_url='https://example.com/' ORDER BY fecha_scan DESC LIMIT 1
         Estrcutura tabla:
             target_url 
             report_file = db.Column(JSON, nullable=True)
@@ -178,9 +178,58 @@ def resumenes_comparacion(user_input: str) -> str:
     resumen = comparar_reportes(user_input, result)
     return resumen
 
+@tool
+def consultar_escaneres_ejecutandose(input: str) -> str:
+    """
+    Consulta los escaneos que se estan ejecutando actualmente en la base de datos según la pregunta del usuario.
+
+    Args:
+        text (str): La pregunta proporcionada por el usuario sobre los escaneos programados.
+
+    Returns:
+        str: Los resultados de la consulta SQL ejecutada en la base de datos.
+    """
+
+    date = datetime.now().strftime('%Y-%m-%dT%H:%M')
+    
+    # Crear el prompt para el modelo
+    prompt_text = f"""
+    Eres un asistente especializado en consultas SQL. Te voy a pasar los atributos del modelo de la tabla y vas a tener que responder con el formato string solo la consulta sin COMILLAS. 
+    El día de hoy es: {date}.
+    Para poder filtrar por fecha debes hacer la consulta con el mismo formato de fecha '%Y-%m-%d%', además tendrás que ver si el estado está pendiente o no.
+    Ten en cuenta que la fecha aparece con dia y hora si no te dicen hora tendras que sacar todos los escaneres programados para ese dia.
+    class Escaneres_completados(db.Model):
+    __tablename__ = 'escaneos_completados'  
+
+        id = 
+        target_url = db.Column(db.String(200), nullable=False, index=True)
+        estado = db.Column(db.String(50), nullable=False, default='En proceso')
+        fecha_inicio = db.Column(db.DateTime(timezone=True), default=get_utc_now)
+        fecha_fin = db.Column(db.DateTime(timezone=True), default=get_utc_now)
+        intensidad 
+
+    __table_args__ = (
+        Index('idx_target_url_estado', 'target_url', 'estado'),
+    )
+    La pregunta proporcionada por el usuario es: {input}
+    """
+    
+    # Llamar al modelo Gemini para generar la consulta SQL
+    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    response = client.models.generate_content(
+        model="gemini-2.0-flash", contents=prompt_text
+    )
+
+    query = response.text.strip()  
+    print(f"Consulta generada: {query}")
+    result = db.session.execute(text(query)).fetchall()
+    result = str(result)
+        
+    return result
+
 
 # Lista de herramientas disponibles
-tools = [vulnerabilidades, consultar_escaneres_programados, resumenes_comparacion]
+tools = [vulnerabilidades, consultar_escaneres_programados, resumenes_comparacion, consultar_escaneres_ejecutandose]
 
 # Vincular las herramientas al modelo Gemini
 llm_with_tools = llm.bind_tools(tools)
