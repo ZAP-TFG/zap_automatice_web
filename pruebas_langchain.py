@@ -8,13 +8,14 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from datetime import datetime
 from dotenv import load_dotenv
 from langchain.tools import tool  # Decorador para herramientas
-import os
+import os, json
 from extensions import *
-#from app import app, db
+import threading
 from models import Escaneo_programados
 from google import genai
 from sqlalchemy import text
 from langchain_core.messages.tool import ToolMessage
+from scanner import connect_to_zap, add_url_to_sites, perform_scan, send_email
 # Cargar la clave API desde .env
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
@@ -178,6 +179,9 @@ def resumenes_comparacion(user_input: str) -> str:
     resumen = comparar_reportes(user_input, result)
     return resumen
 
+
+
+
 @tool
 def consultar_escaneres_ejecutandose(input: str) -> str:
     """
@@ -228,8 +232,90 @@ def consultar_escaneres_ejecutandose(input: str) -> str:
     return result
 
 
+def ejecutar_scan_en_thread(url, intensity, email):
+    """Función que se ejecutará en un hilo separado."""
+    from extensions import app
+    with app.app_context():
+        zap = connect_to_zap()
+        add_url_to_sites(zap, url)
+        perform_scan(zap, url, intensity)
+        send_email(zap, url,email)
+
+@tool
+def ejecutar_escaner(user_input: str) -> str:
+    """
+    Ejecutar o Programar un escaner para una URL según la pregunta del usuario con url, intensidad, email y la fecha y hora del ejecucion
+
+    Args:
+        user_input (str): La pregunta proporcionada por el usuario sobre los escaneos programados.
+
+    Returns:
+        str: Respuesta indicando si el escaneo ha sido programado o ejecutado.
+    """
+    date = datetime.now().strftime('%Y-%m-%dT%H:%M')
+    prompt_text = f"""
+    Eres un asistente que tiene que extraer la información más relevante de un texto. En este caso, debes extraer:
+    - "url": URL del escaneo.
+    - "fecha_hora": Fecha y hora del escaneo en formato "%Y-%m-%dT%H:%M".
+    - "intensidad": Nivel de intensidad (DEFAULT, LOW, MEDIUM, HIGH, INSANE).
+    - "programado": si o no, indicando si el escaneo es programado.
+    - "email": Email del usuario.
+
+    IMPORTANTE: NO PONGAS comillas triples (`), puntos y comas ni nada que no sea JSON válido.
+    
+    La pregunta proporcionada por el usuario es: {user_input}
+    El día de hoy es: {date}.
+    Responde exclusivamente con un JSON, siguiendo este formato:
+        "url": "https://example.com",
+        "fecha_hora": "2023-10-01T12:00",
+        "intensidad": "DEFAULT",
+        "email": "example@example.com",
+        "programado": si
+    Si no puedes encontrar la información, devuelve un JSON vacío:.
+    """
+
+    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    response = client.models.generate_content(
+        model="gemini-2.0-flash", 
+        contents=prompt_text,
+        config={'response_mime_type': 'application/json'},
+    )   
+
+    # Acceder correctamente al contenido
+    try:
+        result = json.loads(response.text.strip())
+    except (json.JSONDecodeError, AttributeError, IndexError):
+        print("Error al procesar la respuesta del modelo.")
+
+    url = result.get("url")
+    intensity = result.get("intensidad")
+    email = result.get("email")
+    fecha_hora = result.get("fecha_hora")
+    programado = result.get("programado", False)
+
+    if not url or not intensity or not email:
+        return "No se pudo extraer la información necesaria."
+
+    if programado == 'si' or programado == 'Si':
+        
+        escaneo_programado = Escaneo_programados(
+            target_url=url,
+            intensidad=intensity,
+            fecha_programada=datetime.strptime(fecha_hora, "%Y-%m-%dT%H:%M"),
+            estado="PENDIENTE",
+        )
+        db.session.add(escaneo_programado)
+        db.session.commit()
+        return "Escaneo programado correctamente. Serás notificado por email cuando termine el escaneo."
+    else:
+        thread = threading.Thread(target=ejecutar_scan_en_thread, args=(url, intensity, email))
+        thread.start()
+        return "Escaneo ejecutado correctamente. Serás notificado por email cuando termine el escaneo."
+
+
+
 # Lista de herramientas disponibles
-tools = [vulnerabilidades, consultar_escaneres_programados, resumenes_comparacion, consultar_escaneres_ejecutandose]
+tools = [vulnerabilidades, consultar_escaneres_programados, resumenes_comparacion, consultar_escaneres_ejecutandose, ejecutar_escaner]
 
 # Vincular las herramientas al modelo Gemini
 llm_with_tools = llm.bind_tools(tools)

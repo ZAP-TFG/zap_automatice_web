@@ -67,7 +67,7 @@ def configure_scan_strength(zap, strength):
 
 def generate_report(zap, url):
     try:
-        report_dir = os.getenv("REPORT_DIR", "./reportes")
+        report_dir = os.getenv(r"REPORT_DIR", "./reportes")
         if not os.path.exists(report_dir):
             os.makedirs(report_dir)
 

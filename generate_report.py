@@ -152,7 +152,8 @@ def agregar_alerta_tabla_6(doc, datos_alerta):
     tabla = doc.tables[6]
     # Agregar una nueva fila al final de la tabla
     nueva_fila = tabla.add_row()
-
+    
+    color_hex = "#FFFFFF"  
     # Completar las celdas de la nueva fila con los datos proporcionados
     celdas = nueva_fila.cells
     celdas[0].text = str(datos_alerta[0])  # Vulnerabilidad
@@ -175,7 +176,7 @@ def agregar_alerta_tabla_6(doc, datos_alerta):
 
     # Aplicar color de fondo a la celda
     celdas[3]._element.get_or_add_tcPr().append(parse_xml(
-        f'<w:shd {nsdecls("w")} w:fill="{color_hex.replace("#", "")}"/>'
+        f'<w:shd {nsdecls("w")} w:fill="{(color_hex or "#FFFFFF").replace("#", "")}"/>'
     ))
 
     for cell in nueva_fila.cells:

@@ -59,7 +59,7 @@ $(document).ready(function () {
 
         const converter = new showdown.Converter();
         const sanitizedReply = $('<div>').text(response.reply).html(); // Escapar contenido
-        const html = converter.makeHtml(sanitizedReply);
+        const html = converter.makeHtml(response.reply);
 
         const botReply = `
             <div class="text-start mb-3">
