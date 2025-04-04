@@ -48,6 +48,16 @@ class Vulnerabilidades_totales(db.Model):
     vul_tot_bajas = db.Column(db.Integer, default=0, nullable=False)
     vul_tot_info = db.Column(db.Integer, default=0, nullable=False)
     vul_all_totales = db.Column(db.Integer, default=0, nullable=False)
+    a01 = db.Column(db.Integer, default=0, nullable=False)
+    a02 = db.Column(db.Integer, default=0, nullable=False)
+    a03 = db.Column(db.Integer, default=0, nullable=False)
+    a04 = db.Column(db.Integer, default=0, nullable=False)
+    a05 = db.Column(db.Integer, default=0, nullable=False)
+    a06 = db.Column(db.Integer, default=0, nullable=False)
+    a07 = db.Column(db.Integer, default=0, nullable=False)
+    a08 = db.Column(db.Integer, default=0, nullable=False)
+    a09 = db.Column(db.Integer, default=0, nullable=False)
+    a10 = db.Column(db.Integer, default=0, nullable=False)
 
 class Reportes_vulnerabilidades_url(db.Model):
     __tablename__ = 'reportes_vulnerabilidades_url'  
@@ -76,7 +86,7 @@ class Escaneo_programados(db.Model):
     archivo_subido = db.Column(db.String(200), nullable=True)
     api_scan = db.Column(db.Boolean, default=False)
     api_file = db.Column(JSON, nullable=True)
-    email = db.Column(db.String(120), nullable=False, server_default='gizquierdog@cofares.es')
+    email = db.Column(db.String(120), nullable=True, server_default='gizquierdog@cofares.es')
     periodicidad_dias = db.Column(db.Integer, default=0)
 
     __table_args__ = (

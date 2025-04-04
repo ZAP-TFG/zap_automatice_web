@@ -101,6 +101,7 @@ def execute_scan(scan_id):
                 zap = connect_to_zap()
                 add_url_to_sites(zap, scan.target_url)
                 perform_scan(zap, scan.target_url, scan.intensidad)
+                
 
                 scan.estado = 'COMPLETADO'
                 db.session.commit()

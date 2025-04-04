@@ -61,28 +61,21 @@
             </div>
         </div>
     </div>
-
-
-</div>
-
-<!-- ChatBot Modal -->
-<div class="modal fade" id="chatBotModal" tabindex="-1" aria-labelledby="chatBotModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="chatBotModalLabel">Details Summary</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p id="chatSummary"></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="sendToChat">Send to Chat</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+    <div class="row my-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">OWASP TOP 10</h5>
+                    <canvas id="radarChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
+
+    
 </div>
+
+
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.4/index.global.min.js"></script>
@@ -122,22 +115,51 @@
         }
     });
 
+    const ctx = document.getElementById('radarChart').getContext('2d');
+
+    const radarChart = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: {{ data.owasp_top_10.labels | tojson }},
+        datasets: [{
+          label: 'OWASP TOP 10',
+          data: {{data.owasp_top_10.data | tojson}},
+          fill: true,
+          backgroundColor: 'rgba(54, 162, 235, 0.3)', 
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 2, 
+          pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          r: {
+            angleLines: { color: "rgba(255, 255, 255, 0.3)" }, /* Líneas más visibles */
+            grid: { color: "rgba(255, 255, 255, 0.2)" }, /* Mejor visibilidad */
+            pointLabels: { color: "white", font: { size: 14 } }, /* Letras blancas */
+            ticks: { color: "white", backdropColor: "transparent", font: { size: 12 } } /* Numeración blanca */
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: "white" } /* Leyenda blanca */
+          },
+          title: {
+            display: true,
+            text: 'Radar Chart - A01 a A10',
+            color: "white"
+          }
+        }
+      }
+    });
     
 
-    // ChatBot Modal
-    document.querySelectorAll('.view-details').forEach(button => {
-        button.addEventListener('click', () => {
-            const summary = button.getAttribute('data-summary');
-            document.getElementById('chatSummary').textContent = summary;
-            const modal = new bootstrap.Modal(document.getElementById('chatBotModal'));
-            modal.show();
-        });
-    });
-
-    document.getElementById('sendToChat').addEventListener('click', () => {
-        const summary = document.getElementById('chatSummary').textContent;
-        // Aquí puedes enviar el resumen al backend o chatbot.
-        console.log('Sending to chat:', summary);
-    });
+    
+    
 </script>
 {% endblock %}

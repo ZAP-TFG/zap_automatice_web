@@ -14,6 +14,8 @@ from docx.oxml import OxmlElement
 from google import genai
 import time, json, os
 from dotenv import load_dotenv
+from extensions import db
+from models import Vulnerabilidades_totales
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -221,7 +223,29 @@ def consulta_gemini(alert_name,alert_desc,alert_cwe):
         print(f"Error al obtener datos de la alerta: {e}")
         return {"descripcion": "", "riesgo": "", "solucion": "", "owasp": ""}
     
-
+def agragar_datos_owasp_vulneravilidades_totales(owaps_top_10):
+    vuln_totales = db.session.query(Vulnerabilidades_totales).first()
+    if owaps_top_10 == 'A01':
+        vuln_totales.a01 += 1
+    elif owaps_top_10 == 'A02':
+        vuln_totales.a02 += 1
+    elif owaps_top_10 == 'A03':
+        vuln_totales.a03 += 1
+    elif owaps_top_10 == 'A04':
+        vuln_totales.a04 += 1
+    elif owaps_top_10 == 'A05': 
+        vuln_totales.a05 += 1
+    elif owaps_top_10 == 'A06':
+        vuln_totales.a06 += 1
+    elif owaps_top_10 == 'A07':
+        vuln_totales.a07 += 1
+    elif owaps_top_10 == 'A08':
+        vuln_totales.a08 += 1
+    elif owaps_top_10 == 'A09':
+        vuln_totales.a09 += 1
+    elif owaps_top_10 == 'A10':
+        vuln_totales.a10 += 1
+    db.session.commit()
 
 def get_alertas(url):
     zap = connect_zap()
@@ -279,6 +303,7 @@ def get_alertas(url):
             'referencias':alert_references
         })
         datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos['owasp'], alert_risk_spanish, "Detectada"]
+        agragar_datos_owasp_vulneravilidades_totales(datos_alerta[2])
         cont += 1
         agregar_alerta_tabla_6(doc, datos_alerta)
     agregar_tablas_vulnerabilidades(doc,len(alertas_set))

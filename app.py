@@ -77,7 +77,22 @@ def home():
                     vul_totales.vul_tot_medias if vul_totales else 0,
                     vul_totales.vul_tot_altas if vul_totales else 0,
                 ]
+            },
+            "owasp_top_10": {
+                "labels": ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09', 'A10'],
+                "data": [
+                    vul_totales.a01 if vul_totales else 0,
+                    vul_totales.a02 if vul_totales else 0,
+                    vul_totales.a03 if vul_totales else 0,
+                    vul_totales.a04 if vul_totales else 0,
+                    vul_totales.a05 if vul_totales else 0,
+                    vul_totales.a06 if vul_totales else 0,
+                    vul_totales.a07 if vul_totales else 0,
+                    vul_totales.a08 if vul_totales else 0,
+                    vul_totales.a09 if vul_totales else 0,
+                    vul_totales.a10 if vul_totales else 0,]
             }
+
         }
         return render_template('index.html', data=data)
     except Exception as e:
