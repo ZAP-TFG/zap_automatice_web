@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify,  redirect, url_for, session, flash
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from datetime import datetime
@@ -17,6 +17,8 @@ from models import (
 )
 from forms import ScanForm, ChatForm
 from pruebas_langchain import graph_memory
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Configuración de logging
 logging.basicConfig(
@@ -33,6 +35,7 @@ app.config['SECRET_KEY'] = os.urandom(32)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zap_data_base.db?journal_mode=WAL&timeout=30'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+
 # Configuración de CORS (restringido a dominios específicos)
 CORS(app, resources={r"/get_calendar_events": {"origins": "http://localhost"}})
 
@@ -40,6 +43,11 @@ CORS(app, resources={r"/get_calendar_events": {"origins": "http://localhost"}})
 db.init_app(app)
 migrate = Migrate(app, db)
 
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"]
+)
 # Constantes
 DATE_FORMAT = '%Y-%m-%dT%H:%M'
 
@@ -54,12 +62,57 @@ def add_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Content-Security-Policy'] = "default-src * data: blob: filesystem: 'unsafe-inline' 'unsafe-eval'; img-src * data: blob:;"
     response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
     return response
 
+USERNAME = os.getenv('APP_USERNAME', 'admin')
+PASSWORD_HASH = os.getenv('APP_PASSWORD', 'password')
 #### Rutas ####
+@app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")  # Limitar a 5 intentos por minuto
+def login():
+    """
+    Página de inicio de sesión.
+    """
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        if username == USERNAME and password == PASSWORD_HASH:
+            session['logged_in'] = True
+            flash('Inicio de sesión exitoso.', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash('Usuario o contraseña incorrectos.', 'danger')
+            return render_template('login.html')
+
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """
+    Cierra la sesión del usuario.
+    """
+    session.pop('logged_in', None)
+    flash('Has cerrado sesión.', 'info')
+    return redirect(url_for('login'))
+
+# Decorador para proteger rutas
+def login_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            flash('Por favor, inicia sesión para acceder a esta página.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
 @app.route('/home', methods=['GET', 'POST'])
+@login_required
 def home():
     """
     Página principal que muestra estadísticas de escaneos y vulnerabilidades.
@@ -100,6 +153,7 @@ def home():
         return render_template('error.html', message="Error al cargar la página principal."), 500
 
 @app.route('/scan', methods=['GET', 'POST'])
+@login_required
 def scan():
     """
     Página para iniciar un escaneo.
@@ -108,6 +162,7 @@ def scan():
     return render_template('scan.html', form=form)
 
 @app.route('/calendar', methods=['GET'])
+@login_required
 def calendar():
     """
     Página del calendario de escaneos.
@@ -115,6 +170,7 @@ def calendar():
     return render_template('calendar.html')
 
 @app.route('/get_calendar_events', methods=['GET'])
+@login_required
 def get_calendar_events():
     """
     Obtiene los eventos del calendario (escaneos completados y programados).
@@ -168,6 +224,7 @@ def get_calendar_events():
         return jsonify({'error': 'Error al obtener eventos del calendario.'}), 500
     
 @app.route('/process_scan', methods=['POST'])
+@login_required
 def process_scan():
     """
     Procesa un escaneo (inmediato o programado).
@@ -228,6 +285,7 @@ def process_scan():
         return jsonify({'status': 'error', 'message': 'Error al procesar el escaneo.'}), 500
     
 @app.route('/chatBot', methods=['GET', 'POST'])
+@login_required
 def chatBot():
     """
     Página para interactuar con el chatbot.
@@ -236,6 +294,7 @@ def chatBot():
     return render_template('chatbot.html', form=form)
 
 @app.route('/context_chatgpt', methods=['POST'])
+@login_required
 def interact_with_gpt_context():
     """
     Interactúa con el chatbot basado en LangChain.
@@ -256,8 +315,13 @@ def interact_with_gpt_context():
 
         if not chatbot_reply:
             chatbot_reply = "Lo siento, no pude generar una respuesta."
+        print(chatbot_reply, type(chatbot_reply))
 
-        return jsonify({'reply': chatbot_reply})
+        if isinstance(chatbot_reply, list):
+            respuesta = "\n".join(str(part).strip() for part in chatbot_reply)
+            return jsonify({'reply': respuesta})
+        elif isinstance(chatbot_reply, str):
+            return jsonify({'reply': chatbot_reply})
     except Exception as e:
         logging.error(f"Error al interactuar con el chatbot: {e}")
         return jsonify({'error': 'Hubo un problema al procesar la solicitud.'}), 500

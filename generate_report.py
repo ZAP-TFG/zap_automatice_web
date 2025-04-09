@@ -302,7 +302,7 @@ def get_alertas(url):
             'solucion': datos['solucion'],
             'referencias':alert_references
         })
-        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos['owasp'], alert_risk_spanish, "Detectada"]
+        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos["owasp"], alert_risk_spanish, "Detectada"]
         agragar_datos_owasp_vulneravilidades_totales(datos_alerta[2])
         cont += 1
         agregar_alerta_tabla_6(doc, datos_alerta)
