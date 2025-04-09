@@ -19,6 +19,7 @@ from forms import ScanForm, ChatForm
 from pruebas_langchain import graph_memory
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from threading import Thread
 
 # Configuración de logging
 logging.basicConfig(
@@ -274,11 +275,17 @@ def process_scan():
                 return jsonify({'status': 'error', 'message': 'Formato de fecha y hora inválido.'}), 400
 
         # Escaneo inmediato
-        zap = connect_to_zap()
-        add_url_to_sites(zap, url)
-        scan_id = perform_scan(zap, url, intensity)
-        send_email(zap, url, email)
-        return jsonify({'status': 'success', 'message': f'Escaneo completado con ID {scan_id}'}), 200
+        if not scheduled:
+            def run_scan_thread():
+                with app.app_context():
+                    zap = connect_to_zap()
+                    add_url_to_sites(zap, url)
+                    perform_scan(zap, url, intensity)
+                    send_email(zap, url, email)
+
+            Thread(target=run_scan_thread).start()
+
+        return jsonify({'status': 'success', 'message': 'Escaneo ejecutándose en segundo plano.'}), 200
 
     except Exception as e:
         logging.error(f"Error al procesar el escaneo: {e}")
