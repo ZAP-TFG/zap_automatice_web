@@ -17,12 +17,21 @@ class ScanForm(FlaskForm):
     def validate_scanDateTime(self, field):
         if self.schedule.data and not field.data:
             raise ValidationError('Date and Time is required if you are scheduling the scan.')
-        
+
+
 class ChatForm(FlaskForm):
     message = StringField('User Message', validators=[DataRequired()], render_kw={"placeholder": "Escribe mensage aqui"})
     submit = SubmitField('Enviar')
     submit2 = SubmitField('Configuracion')
 
-class Vulnerabilities(FlaskForm):
-    url = StringField('URL', validators=[DataRequired(), URL()], render_kw={"placeholder": "https://example.com"})
-    submit = SubmitField('Comparar')
+
+def file_type_check(form, field):
+    if not field.data.filename.endswith('.json'):
+        raise ValidationError("Solo se permiten archivos JSON.")
+
+class FileUploadForm(FlaskForm):
+    file = FileField('Subir archivo JSON', validators=[
+        DataRequired(message="Debe seleccionar un archivo."),
+        file_type_check
+    ])
+    submit = SubmitField('Procesar archivo')

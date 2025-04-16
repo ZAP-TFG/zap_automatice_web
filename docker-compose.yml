@@ -1,40 +1,55 @@
+version: "3.9"
 
 services:
+  db:
+    image: postgres:17.4
+    container_name: db
+    restart: always
+    environment:
+      POSTGRES_USER: ${PSQL_USER}
+      POSTGRES_PASSWORD: ${PSQL_PASSWORD}
+      POSTGRES_DB: ${PSQL_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
   zap:
     image: owasp/zap2docker-stable
     container_name: zap
-    networks:
-      - internal
-    environment:
-      - ZAP_API_KEY=dpmrvf282ecssm6rlb4mjci5et  # Asegúrate de reemplazar con un API key si es necesario
+    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
     ports:
-      - "8080:8080"  # Si deseas exponer ZAP a puertos locales
-    entrypoint: ["zap.sh", "-daemon", "-port", "8080", "-host", "0.0.0.0"]
-    volumes:
-      - zap-data:/zap/wrk/
-      - ./instances:/zap/instances  # Montamos la carpeta instances para que ZAP pueda acceder a la base de datos
+      - "8080:8080"
+    restart: always
 
   app:
     build: .
     container_name: flask_app
-    networks:
-      - internal
-    environment:
-      - FLASK_APP=app.py
-      - FLASK_ENV=development
-    volumes:
-      - .:/app
-      - ./jobs.db:/app/jobs.db  # Montamos la base de datos jobs.db para la app Flask
+    restart: always
+    env_file:
+      - .env
     depends_on:
+      - db
       - zap
     ports:
-      - "5000:5000"  # Exponer el puerto de Flask hacia el exterior
-    command: ["gunicorn", "-b", "0.0.0.0:5000", "app:app"]
+      - "5000:5000"
+    environment:
+      - PSQL_HOST=db
+      - PSQL_PORT=5432
+      - PSQL_USER=${PSQL_USER}
+      - PSQL_PASSWORD=${PSQL_PASSWORD}
+      - PSQL_DB=${PSQL_DB}
+      - ZAP_API_KEY=${ZAP_API_KEY}
+      - ZAP_URL=${ZAP_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - REPORT_DIR=${REPORT_DIR}
+      - APP_USERNAME=${APP_USERNAME}
+      - APP_PASSWORD=${APP_PASSWORD}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+    volumes:
+      - ./reports:/reports
 
 volumes:
-  zap-data:
-    driver: local
-
-networks:
-  internal:
-    driver: bridge
+  pgdata:

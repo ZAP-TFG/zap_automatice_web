@@ -9,17 +9,19 @@ from extensions import db, app
 from flask_migrate import Migrate
 from scanner import connect_to_zap, add_url_to_sites, perform_scan, send_email
 from schedule_scans import init_scheduler
+from dotenv import load_dotenv
 from models import (
     Escaneres_completados,
     Escaneo_programados,
     Reportes_vulnerabilidades_url,
     Vulnerabilidades_totales,
 )
-from forms import ScanForm, ChatForm
+from forms import ScanForm, ChatForm, FileUploadForm
 from pruebas_langchain import graph_memory
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from threading import Thread
+from generate_report import remplazar_texto, remplazar_encabezado, modificar_primer_tabla, procesar_alertas, contexto_resumen_ejecutivo
 
 # Configuración de logging
 logging.basicConfig(
@@ -31,9 +33,18 @@ logging.basicConfig(
     ]
 )
 
+
+
+load_dotenv()
+DB_USER = os.getenv("PSQL_USER")
+DB_PASSWORD = os.getenv("PSQL_PASSWORD")
+DB_HOST = os.getenv("PSQL_HOST")
+DB_PORT = os.getenv("PSQL_PORT")
+DB_NAME = "zap_data_base" 
+
 # Configuración de la aplicación
 app.config['SECRET_KEY'] = os.urandom(32)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zap_data_base.db?journal_mode=WAL&timeout=30'
+app.config['SQLALCHEMY_DATABASE_URI'] = (f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}') #sqlite:///zap_data_base.db?journal_mode=WAL&timeout=30'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 
@@ -332,6 +343,40 @@ def interact_with_gpt_context():
     except Exception as e:
         logging.error(f"Error al interactuar con el chatbot: {e}")
         return jsonify({'error': 'Hubo un problema al procesar la solicitud.'}), 500
+
+@app.route('/upload', methods=['GET', 'POST'])
+@login_required
+def upload_file():
+    form = FileUploadForm()
+    if form.validate_on_submit():
+        file = form.file.data  # Obtiene el archivo subido
+        from docx import Document
+        doc = Document(r"C:\Users\gizquierdog\Documents\custom_report\custom_report.docx")
+        try:
+            json_data = json.load(file)
+            print(json_data)
+            url = json_data['site'][0]['@name']
+            alertas = json_data['site'][0]['alerts']
+            print(url)
+            for alert in alertas:
+                print(alert.get('alert'))
+            
+            remplazos = {
+                "{nombre-url}": json_data['site'][0]['@name'],
+                "{date}": datetime.now().strftime('%d/%m/%Y'),
+            }
+            remplazar_texto(doc,remplazos)
+            remplazar_encabezado(doc,remplazos)
+            modificar_primer_tabla(doc,remplazos)
+            alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set = procesar_alertas(alertas,url,doc)
+            contexto_resumen_ejecutivo(url, alertas_set, url,doc)
+            
+            doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
+            print("✅ Documento generado correctamente con gráfica insertada.")
+        except json.JSONDecodeError:
+            print("El archivo no contiene un JSON válido.", 'danger')
+
+    return render_template('generate_report.html', form=form)
 
 if __name__ == '__main__':
     init_scheduler_scans()

@@ -247,9 +247,7 @@ def agragar_datos_owasp_vulneravilidades_totales(owaps_top_10):
         vuln_totales.a10 += 1
     db.session.commit()
 
-def get_alertas(url):
-    zap = connect_zap()
-    alerts = zap.alert.alerts(url)
+def procesar_alertas(alerts,url,doc):
     risk_order = {"High": 1, "Medium": 2, "Low": 3, "Informational": 4}
     risk_translation = {
     "High": "Alto",
@@ -268,38 +266,49 @@ def get_alertas(url):
     alertas_info =[]
     for alert in alerts_sorted:
         alert_name = alert.get('name')
-        if alert.get('risk') == 'High':
+        alert_risk = alert.get('risk')
+        if alert_risk == None:
+            alert_risk = alert.get('riskdesc')
+        alert_risk = alert_risk.lower()
+
+        if 'high'in alert_risk or 'alto' in alert_risk:
             alertas_high_set.add(alert_name)
-        elif alert.get('risk') == 'Medium':
+            risk_normalizado = 'High'
+        elif 'medium'in alert_risk or 'medio' in alert_risk:
             alertas_medium_set.add(alert_name)
-        elif alert.get('risk') == 'Low':
-            alertas_low_set.add(alert_name)    
-        elif alert.get('risk') == 'Informational':
+            risk_normalizado = 'Medium'
+        elif  'low' in alert_risk or 'bajo' in alert_risk:
+            alertas_low_set.add(alert_name)   
+            risk_normalizado = 'Low' 
+        elif 'informational' in alert_risk or 'informativo' in alert_risk:
             alertas_informational_set.add(alert_name)
+            risk_normalizado = 'Informational'
         
         if alert_name in alertas_set:
             continue
         
         alertas_set.add(alert_name)
-        alert_risk = alert.get('risk')
-        alert_risk_spanish = risk_translation.get(alert_risk, alert_risk)
+        # alert_risk = alert.get('risk')
+        alert_risk_spanish = risk_translation.get(risk_normalizado, risk_normalizado)
         alertas_filtradas = [alerta for alerta in alerts if alerta['alert'] == alert_name]
         alert_count = len(alertas_filtradas)
         alert_desc = alert.get('desc')
         alert_cwe = alert.get('cweid')
         alert_references = alert.get('reference')
+        print(alert_count,alert_desc,alert_cwe,alert_risk,alert_risk_spanish)
         datos = consulta_gemini(alert_name,alert_desc,alert_cwe)
+        print(datos, type(datos))
         time.sleep(0.5)
         alertas_info.append({
             'numero': f"{cont:02d}",
             'alert_name': alert_name,
             'risk': alert_risk_spanish,
-            'owasp': datos['owasp'], 
+            'owasp': datos["owasp"], 
             'cwe': alert_cwe,
             'url': url,
-            'detalles': datos['detalles'],
-            'riesgo': datos['riesgo'],
-            'solucion': datos['solucion'],
+            'detalles': datos["detalles"],
+            'riesgo': datos["riesgo"],
+            'solucion': datos["solucion"],
             'referencias':alert_references
         })
         datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos["owasp"], alert_risk_spanish, "Detectada"]
@@ -314,6 +323,73 @@ def get_alertas(url):
     
     return  alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set
 
+def get_alertas(url):
+    zap = connect_zap()
+    alerts = zap.alert.alerts(url)
+    # risk_order = {"High": 1, "Medium": 2, "Low": 3, "Informational": 4}
+    # risk_translation = {
+    # "High": "Alto",
+    # "Medium": "Medio",
+    # "Low": "Bajo",
+    # "Informational": "Informativo"
+    # }
+    # alerts_sorted = sorted(alerts, key=lambda x: risk_order.get(x.get('risk', 'Informational'), 4))
+    # alertas_set = set()
+    # alertas_high_set = set()
+    # alertas_medium_set = set()
+    # alertas_low_set = set()
+    # alertas_informational_set = set()
+    # cont = 1
+    
+    # alertas_info =[]
+    # for alert in alerts_sorted:
+    #     alert_name = alert.get('name')
+    #     if alert.get('risk') == 'High':
+    #         alertas_high_set.add(alert_name)
+    #     elif alert.get('risk') == 'Medium':
+    #         alertas_medium_set.add(alert_name)
+    #     elif alert.get('risk') == 'Low':
+    #         alertas_low_set.add(alert_name)    
+    #     elif alert.get('risk') == 'Informational':
+    #         alertas_informational_set.add(alert_name)
+        
+    #     if alert_name in alertas_set:
+    #         continue
+        
+    #     alertas_set.add(alert_name)
+    #     alert_risk = alert.get('risk')
+    #     alert_risk_spanish = risk_translation.get(alert_risk, alert_risk)
+    #     alertas_filtradas = [alerta for alerta in alerts if alerta['alert'] == alert_name]
+    #     alert_count = len(alertas_filtradas)
+    #     alert_desc = alert.get('desc')
+    #     alert_cwe = alert.get('cweid')
+    #     alert_references = alert.get('reference')
+    #     datos = consulta_gemini(alert_name,alert_desc,alert_cwe)
+    #     time.sleep(0.5)
+    #     alertas_info.append({
+    #         'numero': f"{cont:02d}",
+    #         'alert_name': alert_name,
+    #         'risk': alert_risk_spanish,
+    #         'owasp': datos["owasp"], 
+    #         'cwe': alert_cwe,
+    #         'url': url,
+    #         'detalles': datos["detalles"],
+    #         'riesgo': datos["riesgo"],
+    #         'solucion': datos["solucion"],
+    #         'referencias':alert_references
+    #     })
+    #     datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos["owasp"], alert_risk_spanish, "Detectada"]
+    #     agragar_datos_owasp_vulneravilidades_totales(datos_alerta[2])
+    #     cont += 1
+    #     agregar_alerta_tabla_6(doc, datos_alerta)
+    # agregar_tablas_vulnerabilidades(doc,len(alertas_set))
+    # tabla_index = 8
+    # print(alertas_high_set,alertas_medium_set,alertas_low_set,alertas_informational_set)
+    # for i, alert_info in enumerate(alertas_info):
+    #     rellenar_tabla_vulnerabilidades(doc,tabla_index+i,alert_info)
+    
+    # return  alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set
+    return  procesar_alertas(alerts,url,doc)
 
 def rellenar_tabla_vulnerabilidades(doc,cont,alert_info):
     tabla = doc.tables[cont]
@@ -348,7 +424,7 @@ def agregar_tablas_vulnerabilidades(doc,n):
         salto_pagina.addnext(nueva_tabla) 
         
     doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
-def contexto_resumen_ejecutivo(url, alertas_set, target_url):
+def contexto_resumen_ejecutivo(url, alertas_set, target_url,doc):
     datos_json = alertas_set
     time.sleep(1)
     prompt_text = f"""
