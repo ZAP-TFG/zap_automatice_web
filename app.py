@@ -3,7 +3,7 @@ load_dotenv()
 import os
 import json
 import logging
-from flask import Flask, render_template, request, jsonify,  redirect, url_for, session, flash
+from flask import Flask, render_template, request, jsonify,  redirect, url_for, session, flash,  send_from_directory, current_app
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from datetime import datetime
@@ -375,9 +375,18 @@ def upload_file():
             modificar_primer_tabla(doc,remplazos)
             alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set = procesar_alertas(alertas,url,doc)
             contexto_resumen_ejecutivo(url, alertas_set, url,doc)
-            
-            doc.save("./reportes/custom_report_modificado.docx")
+            output_filename = "custom_report_modificado.docx"
+            output_path = os.path.join(current_app.root_path, "reportes", output_filename)
+            doc.save(output_path)
+            #doc.save("./reportes/custom_report_modificado.docx")
+            return send_from_directory(
+                directory=os.path.join(current_app.root_path, "reportes"),
+                path=output_filename,
+                as_attachment=True,
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
             print("✅ Documento generado correctamente con gráfica insertada.")
+
         except json.JSONDecodeError:
             print("El archivo no contiene un JSON válido.", 'danger')
 

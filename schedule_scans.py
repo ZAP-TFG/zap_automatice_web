@@ -47,7 +47,7 @@ def init_scheduler():
                 scheduler.add_job(
                     check_for_pending_scans,
                     'interval',
-                    minutes=1,
+                    minutes=5,
                     id='check_pending_scans',
                     misfire_grace_time=10000,
                     max_instances=1
