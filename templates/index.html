@@ -70,13 +70,38 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-6">
+            <div class="card" style="background-color: #1e1e1e;">
+                <div class="card-body text-white text-center">
+                    <h2 class="card-title text-white text-center">PROGRESO DEL ESCANER</h2>
+                    <br>
+                    <div id="ultimoScanner">...</div>
+                <br>
+                <br>
+                    <div class="d-flex justify-content-center">
+                        <div style="width: 250px; height: 250px;">
+                            <canvas id="scanProgressChart"></canvas>
+                        </div>
+                    </div>
+                    <br>
+                    <br>
+                    <div class="text-center text-white mt-3">
+                        <div><h4>Próximo Escaner</h4></div>
+                        <div id="proximoScanner">...</div>
+                        <div id="proximoScannerFecha">...</div>
+                    </div>
+                    <br>
+                    <br>
+                </div>
+            </div>
+        </div>
     </div>
-
+    
     
 </div>
 
 
-
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.4/index.global.min.js"></script>
 <script>
@@ -158,6 +183,86 @@
       }
     });
     
+    // Configuración del gráfico donut para el progreso
+    const progressCtx = document.getElementById('scanProgressChart').getContext('2d');
+    const progressChart = new Chart(progressCtx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [0, 100],  // [progreso, restante]
+                backgroundColor: ["#3aef37", "#333333"],  // [color progreso, color fondo]
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            radius: '100%',
+            cutout: '85%',  // Tamaño del hueco en el centro
+            plugins: {
+                legend: {
+                    display: false  // Ocultar leyenda
+                },
+                tooltip: {
+                    enabled: false  // Desactivar tooltips
+                }
+            }
+        },
+        plugins: [{
+            id: 'centerText',
+            beforeDraw: function(chart) {
+                const width = chart.width;
+                const height = chart.height;
+                const ctx = chart.ctx;
+                
+                ctx.restore();
+                
+                // Texto del porcentaje en el centro
+                const fontSize = (height / 114).toFixed(2);
+                ctx.font = fontSize + "em sans-serif";
+                ctx.textBaseline = "middle";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#9b9b9b"; //textto
+                
+                const text = chart.data.datasets[0].data[0] + "%";
+                ctx.fillText(text, width / 2, height / 2);
+                
+                ctx.save();
+            }
+        }]
+    });
+
+    // Función para actualizar el gráfico de progreso
+    function actualizarProgreso() {
+        $.ajax({
+            url: '/scan_progress',
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                // Actualizar datos del gráfico
+                progressChart.data.datasets[0].data = [data.progress, 100 - data.progress];
+                progressChart.update();
+                
+                document.getElementById('ultimoScanner').innerText = data.ultimoScanner;
+                document.getElementById('proximoScanner').innerText = data.proximo;
+                document.getElementById('proximoScannerFecha').innerText = data.fecha;
+               
+                // Si no ha terminado, seguir consultando
+                if (data.progress < 100) {
+                    setTimeout(actualizarProgreso, 2000);  // Consultar cada 2 segundos
+                }
+            },
+            error: function(error) {
+                console.error("Error al obtener el progreso:", error);
+                setTimeout(actualizarProgreso, 5000);  // Reintentar en 5 segundos
+            }
+        });
+    }
+
+    // Iniciar la actualización al cargar la página
+    $(document).ready(function() {
+        actualizarProgreso();
+    });
 
     
     

@@ -148,7 +148,7 @@ def extract_vulnerabilities(zap, url, end_date):
 def perform_scan(zap, url, strength):
     configure_scan_strength(zap, strength)
     try:
-        scan = Escaneres_completados(target_url=url, estado="En proceso", fecha_inicio=datetime.now(), intensidad=strength)
+        scan = Escaneres_completados(target_url=url, estado="En proceso", fecha_inicio=datetime.now(), intensidad=strength, progreso = 0)
         db.session.add(scan)
         db.session.commit()
 
@@ -159,12 +159,18 @@ def perform_scan(zap, url, strength):
             if (time.time() - start_time) > timeout:
                 logging.error("Timeout exceeded.")
                 break
-            logging.info(f"Scan Progress: {zap.ascan.status(scan_id)}%")
+            progreso = zap.ascan.status(scan_id)
+            logging.info(f"Scan Progress: {progreso}%")
+            scan.progreso = progreso
+            db.session.commit()
             time.sleep(2)
-
+        scan.progreso = 100
+        db.session.commit()
+        time.sleep(1)
         scan.fecha_fin = datetime.now()
         scan.report_file = generate_report(zap, url)
         scan.estado = "COMPLETADO"
+        
         db.session.commit()
 
         extract_vulnerabilities(zap, url, scan.fecha_fin)

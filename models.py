@@ -30,8 +30,7 @@ class Escaneres_completados(db.Model):
     fecha_inicio = db.Column(db.DateTime(timezone=True), default=get_utc_now)
     fecha_fin = db.Column(db.DateTime(timezone=True), default=get_utc_now)
     intensidad = db.Column(db.String(50), nullable=False, default='DEFAULT')
-    api_scan = db.Column(db.Boolean, default=False)
-    api_file = db.Column(JSON, nullable=True)
+    progreso = db.Column(db.Integer, default=0)
     #report_file = db.Column(JSON, nullable=True) # recoger alertas que umbral medio/alto
 
     __table_args__ = (

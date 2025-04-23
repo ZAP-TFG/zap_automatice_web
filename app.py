@@ -23,7 +23,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from threading import Thread
 from generate_report import remplazar_texto, remplazar_encabezado, modificar_primer_tabla, procesar_alertas, contexto_resumen_ejecutivo
-
+import pytz
 # Configuración de logging
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +59,7 @@ migrate = Migrate(app, db)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"]
+    default_limits=["2000000000 per day", "5000000000 per hour"]
 )
 # Constantes
 DATE_FORMAT = '%Y-%m-%dT%H:%M'
@@ -270,11 +270,15 @@ def process_scan():
             if not dateTime:
                 return jsonify({'status': 'error', 'message': 'La fecha y hora son requeridas para programar el escaneo.'}), 400
             try:
+                madrid_tz = pytz.timezone('Europe/Madrid')
+                utc = pytz.UTC
                 dateTime_programed = datetime.strptime(dateTime, DATE_FORMAT)
+                dateTime_programed = madrid_tz.localize(dateTime_programed)
+                dateTime_programed_utc = dateTime_programed.astimezone(utc)
                 escaneo_programado = Escaneo_programados(
                     target_url=url,
                     intensidad=intensity,
-                    fecha_programada=dateTime_programed,
+                    fecha_programada=dateTime_programed_utc,
                     estado="PENDIENTE",
                     email=email,
                     #api_scan=apiScan,
@@ -379,6 +383,25 @@ def upload_file():
 
     return render_template('generate_report.html', form=form)
 
+@app.route('/scan_progress', methods=['GET'])
+@login_required
+def progreso():
+    try:
+        # Obtener el escaneo más reciente que esté en proceso
+        scan = Escaneres_completados.query.order_by(Escaneres_completados.fecha_inicio.desc()).first()
+        ultimo_escaner = scan.target_url
+        proximo = Escaneo_programados.query.filter_by(estado="PENDIENTE").order_by(Escaneo_programados.fecha_programada.asc()).first()
+        proximo_escaner = proximo.target_url if proximo else "No hay escaneos programados"
+        proximo_fecha = proximo.fecha_programada.isoformat() if proximo else None
+        if scan or proximo:
+            return jsonify({'progress': scan.progreso,'ultimoScanner': ultimo_escaner, 'proximo': proximo_escaner, 'fecha': proximo_fecha})
+        else:
+            return jsonify({'progress': 0, 'ultimoScanner': ultimo_escaner, 'proximo': proximo_escaner, 'fecha': proximo_fecha})
+    except Exception as e:
+        logging.error(f"Error obteniendo el progreso del escaneo: {e}")
+        return jsonify({'progress': 0, 'ultimoScanner': "No hay Ultimo Escaner", 'proximo': "No hay Próximo Escaner", 'fecha': 'No hay Fecha'})
+
+init_scheduler_scans()
 if __name__ == '__main__':
-    init_scheduler_scans()
+    #init_scheduler_scans()
     app.run(host='0.0.0.0', debug=True, port=5000)  # No usar debug=True en producción

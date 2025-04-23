@@ -8,17 +8,27 @@ from scanner import connect_to_zap, add_url_to_sites, perform_scan, send_email
 import logging
 import os
 import threading
+from dotenv import load_dotenv
+import pytz
+load_dotenv()
+
 
 # Configurar logging
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# Configuración del scheduler
-jobstores = {'default': SQLAlchemyJobStore(url='sqlite:///jobs.db')}
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[ logging.StreamHandler(),logging.FileHandler("zap_logs.log", mode="w", encoding="utf-8")]
+)
+
+DB_USER = os.getenv("PSQL_USER")
+DB_PASSWORD = os.getenv("PSQL_PASSWORD")
+DB_HOST = os.getenv("PSQL_HOST")
+DB_PORT = os.getenv("PSQL_PORT")
+DB_NAME = os.getenv("DB_NAME") 
+
+jobstores = {'default': SQLAlchemyJobStore(url='sqlite:////app/data/jobs.db')}
 scheduler = BackgroundScheduler(jobstores=jobstores)
-
 scan_lock = threading.Lock()
 
 
@@ -27,31 +37,32 @@ def init_scheduler():
     Inicializa el programador de tareas y carga trabajos pendientes desde la base de datos.
     """
     try:
-        if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':  
-            logger.info("Initializing scheduler...")
+        #if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':  
+            logging.info("Initializing scheduler...")
             scheduler.start()
-            logger.info("Scheduler started")
+            logging.info("Scheduler started")
 
             
             if not scheduler.get_job('check_pending_scans'):
                 scheduler.add_job(
                     check_for_pending_scans,
                     'interval',
-                    minutes=10,
+                    minutes=1,
                     id='check_pending_scans',
-                    misfire_grace_time=300,
+                    misfire_grace_time=10000,
                     max_instances=1
+                    #jobstore='default'
                 )
-                logger.info("Job para revisar escaneos pendientes agregado.")
+                logging.info("Job para revisar escaneos pendientes agregado.")
 
             with app.app_context():
                 scans = db.session.query(Escaneo_programados).filter_by(estado='PENDIENTE').all()
                 for scan in scans:
                     add_scan_job(scan)
-                logger.info(f"{len(scans)} trabajos cargados desde la base de datos.")
+                logging.info(f"{len(scans)} trabajos cargados desde la base de datos.")
 
     except Exception as e:
-        logger.error(f"Error while initializing scheduler: {e}")
+        logging.error(f"Error while initializing scheduler: {e}")
 
 
 def add_scan_job(scan, immediate_execution=False):
@@ -67,19 +78,20 @@ def add_scan_job(scan, immediate_execution=False):
                 args=[scan.id],
                 id=str(scan.id),
                 misfire_grace_time=10800,  
-                max_instances=1  
+                max_instances=1
+                #jobstore='default'  
             )
-            logger.info(f"Escaneo {scan.id} programado para {scan.fecha_programada}")
+            logging.info(f"Escaneo {scan.id} programado para {scan.fecha_programada}")
 
             if immediate_execution: 
                 execute_scan(scan.id)
                 job.remove()
 
         else:
-            logger.info(f"Escaneo {scan.id} ya está programado.")
+            logging.info(f"Escaneo {scan.id} ya está programado.")
 
     except Exception as e:
-        logger.error(f"Error al programar el escaneo {scan.id}: {e}")
+        logging.error(f"Error al programar el escaneo {scan.id}: {e}")
 
 
 def execute_scan(scan_id):
@@ -88,29 +100,32 @@ def execute_scan(scan_id):
     """
     try:
         if not scan_lock.acquire(blocking=False):
-            logger.warning(f"El escaneo {scan_id} no se puede ejecutar porque otro escaneo está en progreso.")
+            logging.warning(f"El escaneo {scan_id} no se puede ejecutar porque otro escaneo está en progreso.")
             return
 
         with app.app_context():
+           
             scan = db.session.query(Escaneo_programados).get(scan_id)
             if scan:
+                target_url = scan.target_url
+                intensidad = scan.intensidad
                 scan.estado = "EN PROCESO"
                 db.session.commit()
-                logger.info(f"Comenzando escaneo para {scan.target_url} con intensidad {scan.intensidad}.")
+                logging.info(f"Comenzando escaneo para {target_url} con intensidad {intensidad}.")
 
                 zap = connect_to_zap()
-                add_url_to_sites(zap, scan.target_url)
-                perform_scan(zap, scan.target_url, scan.intensidad)
+                add_url_to_sites(zap, target_url)
+                perform_scan(zap, target_url, intensidad)
                 
 
                 scan.estado = 'COMPLETADO'
                 db.session.commit()
-                logger.info(f"Escaneo {scan_id} completado exitosamente.")
+                logging.info(f"Escaneo {scan_id} completado exitosamente.")
 
                 # Enviar correo al finalizar el escaneo
                 send_email(zap, scan.target_url, scan.email if hasattr(scan, 'email') else None)
             else:
-                logger.warning(f"Escaneo con ID {scan_id} no encontrado.")
+                logging.warning(f"Escaneo con ID {scan_id} no encontrado.")
 
     except Exception as e:
         with app.app_context():
@@ -118,7 +133,7 @@ def execute_scan(scan_id):
             if scan:
                 scan.estado = 'ERROR'
                 db.session.commit()
-        logger.error(f"Error al ejecutar el escaneo {scan_id}: {e}")
+        logging.error(f"Error al ejecutar el escaneo {scan_id}: {e}")
 
     finally:
         
@@ -135,6 +150,6 @@ def check_for_pending_scans():
             for scan in scans:
                 if not scheduler.get_job(str(scan.id)):
                     add_scan_job(scan)
-            logger.info(f"Se han revisado {len(scans)} escaneos pendientes.")
+            logging.info(f"Se han revisado {len(scans)} escaneos pendientes.")
     except Exception as e:
-        logger.error(f"Error al revisar escaneos pendientes: {e}")
+        logging.error(f"Error al revisar escaneos pendientes: {e}")
