@@ -16,6 +16,7 @@ from models import Escaneres_completados, Vulnerabilidades_totales, Reportes_vul
 from generate_report import generar_reporte_custom
 
 
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -67,7 +68,7 @@ def configure_scan_strength(zap, strength):
 
 def generate_report(zap, url):
     try:
-        report_dir = os.getenv(r"REPORT_DIR", "./reportes")
+        report_dir = os.getenv("REPORT_DIR", "./reportes")
         if not os.path.exists(report_dir):
             os.makedirs(report_dir)
 
@@ -185,7 +186,7 @@ def perform_scan(zap, url, strength):
 
 
 def send_email(zap, url, email):
-    docx_path = generar_reporte_custom(target_url=url)
+    docx_path = generar_reporte_custom(url)
 
     alerts = zap.alert.alerts(baseurl=url, start=0, count=500)
     vul_dict = {"High": set(), "Medium": set(), "Low": set()}

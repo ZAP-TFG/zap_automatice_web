@@ -23,7 +23,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from threading import Thread
 from generate_report import remplazar_texto, remplazar_encabezado, modificar_primer_tabla, procesar_alertas, contexto_resumen_ejecutivo
-import pytz
+import pytz, time
 # Configuración de logging
 logging.basicConfig(
     level=logging.INFO,
@@ -298,6 +298,18 @@ def process_scan():
                     add_url_to_sites(zap, url)
                     perform_scan(zap, url, intensity)
                     send_email(zap, url, email)
+                    time.sleep(2)
+                    archivos = [
+                        "./reportes/grafica_vulnerabilidades.png",
+                        "./reportes/custom_report_modificado.docx",
+                        "./reportes/alertas.json"
+                    ]
+                    for fichero in archivos:
+                        if os.path.exists(fichero):
+                            os.remove(fichero)
+                            print(f"Archivo {fichero} eliminado.")
+                        else:
+                            print(f"El archivo {fichero} no existe.")    
 
             Thread(target=run_scan_thread).start()
 
@@ -349,48 +361,108 @@ def interact_with_gpt_context():
         logging.error(f"Error al interactuar con el chatbot: {e}")
         return jsonify({'error': 'Hubo un problema al procesar la solicitud.'}), 500
 
-@app.route('/upload', methods=['GET', 'POST'])
-@login_required
+
+def generar_reporte_async(json_data, filename):
+    from docx import Document
+    with app.app_context():
+        doc = Document("./reportes/custom_report.docx")
+        
+        url = json_data['site'][0]['@name']
+        alertas = json_data['site'][0]['alerts']
+
+        remplazos = {
+            "{nombre-url}": url,
+            "{date}": datetime.now().strftime('%d/%m/%Y'),
+        }
+
+        remplazar_texto(doc, remplazos)
+        remplazar_encabezado(doc, remplazos)
+        modificar_primer_tabla(doc, remplazos)
+        alertas_set, *_ = procesar_alertas(alertas, url, doc)
+        contexto_resumen_ejecutivo(url, alertas_set, url, doc)
+
+        output_path = os.path.join(current_app.root_path, "reportes", filename)
+        doc.save(output_path)
+
+@app.route("/upload", methods=["POST", "GET"])
 def upload_file():
     form = FileUploadForm()
     if form.validate_on_submit():
-        file = form.file.data  # Obtiene el archivo subido
-        from docx import Document
-        doc = Document("./reportes/custom_report.docx")
+        file = form.file.data
         try:
             json_data = json.load(file)
-            print(json_data)
-            url = json_data['site'][0]['@name']
-            alertas = json_data['site'][0]['alerts']
-            print(url)
-            for alert in alertas:
-                print(alert.get('alert'))
-            
-            remplazos = {
-                "{nombre-url}": json_data['site'][0]['@name'],
-                "{date}": datetime.now().strftime('%d/%m/%Y'),
-            }
-            remplazar_texto(doc,remplazos)
-            remplazar_encabezado(doc,remplazos)
-            modificar_primer_tabla(doc,remplazos)
-            alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set = procesar_alertas(alertas,url,doc)
-            contexto_resumen_ejecutivo(url, alertas_set, url,doc)
-            output_filename = "custom_report_modificado.docx"
-            output_path = os.path.join(current_app.root_path, "reportes", output_filename)
-            doc.save(output_path)
-            #doc.save("./reportes/custom_report_modificado.docx")
-            return send_from_directory(
-                directory=os.path.join(current_app.root_path, "reportes"),
-                path=output_filename,
-                as_attachment=True,
-                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            )
-            print("✅ Documento generado correctamente con gráfica insertada.")
-
         except json.JSONDecodeError:
-            print("El archivo no contiene un JSON válido.", 'danger')
+            flash("JSON inválido", "danger")
+            return render_template('generate_report.html', form=form)
+        
+        output_filename = f"custom_report_{int(datetime.now().timestamp())}.docx"
+        thread = Thread(target=generar_reporte_async, args=(json_data, output_filename))
+        thread.start()
 
-    return render_template('generate_report.html', form=form)
+        return render_template("procesando.html", filename=output_filename)
+
+    return render_template("generate_report.html", form=form)
+
+@app.route("/reporte_disponible/<filename>")
+def reporte_disponible(filename):
+    path = os.path.join(current_app.root_path, "reportes", filename)
+    if os.path.exists(path):
+        return '', 200
+    return '', 404
+
+@app.route("/descargar_reporte/<filename>")
+def descargar_reporte(filename):
+    return send_from_directory(
+        directory=os.path.join(current_app.root_path, "reportes"),
+        path=filename,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )  
+# @app.route('/upload', methods=['GET', 'POST'])
+# @login_required
+# def upload_file():
+#     form = FileUploadForm()
+#     if form.validate_on_submit():
+#         file = form.file.data  # Obtiene el archivo subido
+#         from docx import Document
+#         doc = Document("./reportes/custom_report.docx")
+#         def proceso_gen_upload():
+#             with app.app_context():
+#                 json_data = json.load(file)
+#                 print(json_data)
+#                 url = json_data['site'][0]['@name']
+#                 alertas = json_data['site'][0]['alerts']
+#                 print(url)
+#                 for alert in alertas:
+#                     print(alert.get('alert'))
+                
+#                 remplazos = {
+#                     "{nombre-url}": json_data['site'][0]['@name'],
+#                     "{date}": datetime.now().strftime('%d/%m/%Y'),
+#                 }
+#                 remplazar_texto(doc,remplazos)
+#                 remplazar_encabezado(doc,remplazos)
+#                 modificar_primer_tabla(doc,remplazos)
+#                 alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set = procesar_alertas(alertas,url,doc)
+#                 contexto_resumen_ejecutivo(url, alertas_set, url,doc)
+#                 output_filename = "custom_report_modificado.docx"
+#                 output_path = os.path.join(current_app.root_path, "reportes", output_filename)
+#                 doc.save(output_path)
+#                 #doc.save("./reportes/custom_report_modificado.docx")
+#                 return send_from_directory(
+#                     directory=os.path.join(current_app.root_path, "reportes"),
+#                     path=output_filename,
+#                     as_attachment=True,
+#                     mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+#                 )
+               
+#         try:
+#             Thread(target=proceso_gen_upload).start()
+
+#         except json.JSONDecodeError:
+#             print("El archivo no contiene un JSON válido.", 'danger')
+
+#     return render_template('generate_report.html', form=form)
 
 @app.route('/scan_progress', methods=['GET'])
 @login_required

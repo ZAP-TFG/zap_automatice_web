@@ -23,7 +23,11 @@ ZAP_API_KEY = os.getenv("ZAP_API_KEY")
 ZAP_URL = os.getenv("ZAP_URL")
 zap_url = ZAP_URL
 
-doc = Document("./reportes/custom_report.docx")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REPORT_DIR = os.path.join(BASE_DIR, "reportes")
+os.makedirs(REPORT_DIR, exist_ok=True)
+template_path = os.path.join(REPORT_DIR, "custom_report.docx")
+doc = Document(template_path)
 
 def connect_zap():
     try:
@@ -109,8 +113,8 @@ def grafica_barras(vul_altas, vul_medias, vul_bajas, vul_informativas):
 
     plt.legend(loc='lower center', bbox_to_anchor=(0.5, -1.25), ncol=len(legend_labels), fontsize=30)
 
-    image_path = ("./reportes/grafica_vulnerabilidades.png")
-
+    # image_path = ("./reportes/grafica_vulnerabilidades.png")
+    image_path = os.path.join(REPORT_DIR, "grafica_vulnerabilidades.png")
     # Guardar la gráfica como imagen
     plt.tight_layout()
     plt.savefig(image_path,bbox_inches='tight')
@@ -193,22 +197,34 @@ def agregar_alerta_tabla_6(doc, datos_alerta):
         ))
 def consulta_gemini(alert_name,alert_desc,alert_cwe):
     prompt_text = f"""
-    Eres un asistente especializado en ciberseguridad. Se te proporcionará el nombre de una alerta y su descripción.
+    Eres un asistente especializado en ciberseguridad. Se te proporcionará el nombre de una alerta, su descripción y CWE.
 
     Tu tarea:
+    En formato JSON, responde a las siguientes preguntas:
     Generar una nueva descripción clara y concisa de la alerta. (45-60 palabras)
     Identificar los posibles riesgos asociados a esta vulnerabilidad.(45-60 palabras)
     Proporcionar una solución para mitigar el problema.(45-60 palabras)
     Determinar el OWASP Top 10 correspondiente, únicamente basándote en el CWE asociado, Solo quiero el A01, A02...
-    Formato de salida (JSON):
-    json
-    "detalles": "",
-    "riesgo": "",
-    "solucion": "",
-    "owasp": ""
     alerta: {alert_name}
     descripcion: {alert_desc} 
-    CWE: {alert_cwe}"""
+    CWE: {alert_cwe}
+    EJEMPLO de salida JSON:
+    
+    {{"detalles": "los detalles oportunos",
+    "riesgo": "riesgo oportuno",
+    "solucion": "soluciones ",
+    "owasp": "A01"}}
+    """
+    schema = {
+    "type": "object",
+    "properties": {
+        "detalles":   {"type": "string"},
+        "riesgo":     {"type": "string"},
+        "solucion":   {"type": "string"},
+        "owasp":      {"type": "string"}
+    },
+    "required": ["detalles","riesgo","solucion","owasp"]
+    }
 
     client = genai.Client(api_key=GEMINI_API_KEY)
     try:
@@ -216,6 +232,8 @@ def consulta_gemini(alert_name,alert_desc,alert_cwe):
             model="gemini-2.0-flash", contents=prompt_text,
             config={
                 'response_mime_type': 'application/json',
+                "responseSchema": schema,
+                "temperature": 0,
             },
         )
         return json.loads(response.text)
@@ -297,21 +315,28 @@ def procesar_alertas(alerts,url,doc):
         alert_references = alert.get('reference')
         print(alert_count,alert_desc,alert_cwe,alert_risk,alert_risk_spanish)
         datos = consulta_gemini(alert_name,alert_desc,alert_cwe)
+        if isinstance(datos, list):
+            datos = datos[0] if datos else {}
+        time.sleep(0.5)
         print(datos, type(datos))
         time.sleep(0.5)
+        owasp = datos.get("owasp", "")
+        detalles = datos.get("detalles", "")
+        riesgo  = datos.get("riesgo", "")
+        solucion = datos.get("solucion", "")
         alertas_info.append({
             'numero': f"{cont:02d}",
             'alert_name': alert_name,
             'risk': alert_risk_spanish,
-            'owasp': datos["owasp"], 
+            'owasp': owasp, 
             'cwe': alert_cwe,
             'url': url,
-            'detalles': datos["detalles"],
-            'riesgo': datos["riesgo"],
-            'solucion': datos["solucion"],
+            'detalles': detalles,
+            'riesgo': riesgo,
+            'solucion': solucion,
             'referencias':alert_references
         })
-        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos["owasp"], alert_risk_spanish, "Detectada"]
+        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, owasp, alert_risk_spanish, "Detectada"]
         agragar_datos_owasp_vulneravilidades_totales(datos_alerta[2])
         cont += 1
         agregar_alerta_tabla_6(doc, datos_alerta)
@@ -423,7 +448,9 @@ def agregar_tablas_vulnerabilidades(doc,n):
         tabla_original._element.addnext(salto_pagina)  
         salto_pagina.addnext(nueva_tabla) 
         
-    doc.save("./reportes/custom_report_modificado.docx")
+    #doc.save("./reportes/custom_report_modificado.docx")
+    output_path = os.path.join(REPORT_DIR, "custom_report_modificado.docx")
+    doc.save(output_path)
 def contexto_resumen_ejecutivo(url, alertas_set, target_url,doc):
     datos_json = alertas_set
     time.sleep(1)
@@ -468,6 +495,8 @@ def contexto_resumen_ejecutivo(url, alertas_set, target_url,doc):
 
 
 def generar_reporte_custom(target_url):
+    output_path = os.path.join(REPORT_DIR, "custom_report_modificado.docx")
+    
     remplazos = {
         "{nombre-url}": target_url,
         "{date}": datetime.now().strftime('%d/%m/%Y'),
@@ -475,12 +504,14 @@ def generar_reporte_custom(target_url):
     remplazar_texto(doc, remplazos)
     remplazar_encabezado(doc, remplazos)
     modificar_primer_tabla(doc, remplazos)
+    doc.save(output_path)
     alertas_set, high_set, medium_set, low_set, informational_set = get_alertas(target_url) 
     contexto_resumen_ejecutivo(target_url, alertas_set, target_url,doc)
     imagen_path = grafica_barras(len(high_set), len(medium_set), len(low_set), len(informational_set))
     insertar_imagen_en_celda(doc, imagen_path, tabla_index=5, fila=1, columna=0)
-    doc.save("./reportes/custom_report_modificado.docx")
+    #doc.save("./reportes/custom_report_modificado.docx")
+    doc.save(output_path)
     print("✅ Documento generado correctamente con gráfica insertada.")
-    doc_path = ("./reportes/custom_report_modificado.docx")
-    return doc_path
+    #doc_path = ("./reportes/custom_report_modificado.docx")
+    return output_path
 
