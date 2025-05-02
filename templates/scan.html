@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
+
 <div class="container mt-5">
     <h2 class="mb-4">Configure Scan</h2>
     <form id="scanForm" method="post" enctype="multipart/form-data">
@@ -40,40 +41,16 @@
             </div>
         </div>
 
-        <!-- Scan para una API -->
-        <div class="form-check form-switch mb-3">
-            {{ form.apiscan.label(class="form-check-label", for="apiSwitch")}} 
-            {{ form.apiscan(class="form-check-input", id="apiSwitch") }} 
-            <!-- <label class="form-check-label" for="apiSwitch">Scan for an API</label> -->
-        </div>
-
-        <!-- Opciones de API dinámicas -->
-        <div id="apiFields" class="d-none">
-            <div class="mb-3">
-                {{ form.configFile.label(class="form-label") }}
-                {{ form.configFile(class="form-control", id="configFile", accept=".json") }}  
-            </div>
-        </div>
-
         <div class="mb-3">
             {{ form.submit(class="btn btn-primary") }}
         </div>
     </form>
 </div>
 
-<script src="/static/js/scan.js"></script>
-
+<!-- Scripts necesarios -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script type="text/javascript">
-    $(document).ready(function () {
-        flatpickr("#datetimepicker", {
-            enableTime: true,     
-            dateFormat: "d/m/Y H:i",  
-            time_24hr: true,      
-            minuteIncrement: 15,  
-        });
-
-    });
-</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="/static/js/scan.js"></script>
 
 {% endblock %}

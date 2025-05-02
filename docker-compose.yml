@@ -1,0 +1,69 @@
+
+services:
+  db:
+    image: postgres:13
+    container_name: zap_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${PSQL_USER}
+      POSTGRES_PASSWORD: ${PSQL_PASSWORD}
+      POSTGRES_DB: zap_data_base
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PSQL_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: zap_container
+    ports:
+      - "8090:8090"
+    command: >
+      zap.sh -daemon -host 0.0.0.0 -port 8090
+      -config api.disablekey=false
+      -config api.key=${ZAP_API_KEY}
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSf http://localhost:8090/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      
+    volumes:
+      - ./reportes:/app/reportes
+
+
+  web:
+    build: .
+    container_name: zap_web
+    ports:
+      - "5000:5000"
+    environment:
+      - ZAP_API_KEY=${ZAP_API_KEY}
+      - ZAP_URL=http://zap:8090
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - REPORT_DIR=/app/reportes
+      - APP_USERNAME=${APP_USERNAME}
+      - APP_PASSWORD=${APP_PASSWORD}
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
+      - PSQL_HOST=db
+      - PSQL_PORT=5432
+      - PSQL_USER=${PSQL_USER}
+      - PSQL_PASSWORD=${PSQL_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+      zap:
+        condition: service_healthy
+        
+    volumes:
+      - ./reportes:/app/reportes
+      - ./data:/app/data
+volumes:
+  pgdata:

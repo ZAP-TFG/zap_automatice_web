@@ -1,81 +1,83 @@
-const scheduleSwitch = document.getElementById('scheduleSwitch');
-const scheduleFields = document.getElementById('scheduleFields');
-
-scheduleSwitch.addEventListener('change', () => {
-    if (scheduleSwitch.checked) {
-        scheduleFields.classList.remove('d-none');
-    } else {
-        scheduleFields.classList.add('d-none');
-    }
-});
-
-const apiSwitch = document.getElementById('apiSwitch');
-const apiFields = document.getElementById('apiFields');
-
-apiSwitch.addEventListener('change', () => {
-    if (apiSwitch.checked) {
-        apiFields.classList.remove('d-none');
-    } else {
-        apiFields.classList.add('d-none');
-    }
-});
-
-
-document.getElementById('scanForm').addEventListener('submit', (event) => {
-    event.preventDefault();
-
- 
-    const url = document.getElementById('scanUrl').value; 
-    const intensity = document.getElementById('scanIntensity').value;
-    const email = document.getElementById('email').value;
-    const scheduled = scheduleSwitch.checked;  
-    const dateTime = scheduled ? document.getElementById('datetimepicker').value : null;  
-    const apiScan = apiSwitch.checked;  
-    const file = apiSwitch.checked ? document.getElementById('configFile').files[0] : null;  
-
-
-    if (!url || !intensity) {
-        alert('Por favor, complete todos los campos obligatorios.');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('url', url);
-    formData.append('intensity', intensity);
-    formData.append('email', email)
-    formData.append('scheduled', scheduled);
-    formData.append('dateTime', dateTime);
-    formData.append('apiScan', apiScan);
-
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const jsonContent = JSON.parse(event.target.result);  
-            formData.append('file', JSON.stringify(jsonContent));  
-            enviarFormulario(formData);
-        };
-        reader.readAsText(file);  // Leemos el archivo como texto
-    } else {
-        enviarFormulario(formData);
-    }
-});
-
-// Función para enviar los datos con fetch
-function enviarFormulario(formData) {
-    fetch('/process_scan', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())  
-    .then(data => {
-        if (data.status === 'success') {
-            alert(data.message);  
-        } else {
-            alert('Error al guardar el escaneo: ' + data.message);  
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Hubo un error al procesar el escaneo.');  
+$(document).ready(function() {
+    // Inicializar el datepicker sin altInput para asegurarse de obtener únicamente el valor con el formato correcto.
+    flatpickr("#datetimepicker", {
+        enableTime: true,
+        dateFormat: "Y-m-d\\TH:i", // Debe coincidir con "%d/%m/%Y %H:%M" en el servidor.
+        time_24hr: true,
+        minuteIncrement: 15,
+        altInput: false  // Se deshabilita el altInput para evitar valores duplicados o formateos inesperados.
     });
-}
+
+    // Manejar el switch para programar el escaneo.
+    $('#scheduleSwitch').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#scheduleFields').removeClass('d-none');
+        } else {
+            $('#scheduleFields').addClass('d-none');
+        }
+    });
+
+    // Manejar el envío del formulario.
+    $('#scanForm').on('submit', function(event) {
+        event.preventDefault();
+
+        const url = $('#scanUrl').val();
+        const intensity = $('#scanIntensity').val();
+        const email = $('#email').val();
+        const scheduled = $('#scheduleSwitch').is(':checked');
+        // Se utiliza trim() para limpiar posibles espacios adicionales en el valor.
+        const dateTime = scheduled ? $('#datetimepicker').val().trim() : null;
+
+        if (!url || !intensity) {
+            alert('Por favor, complete todos los campos obligatorios.');
+            return;
+        }
+
+        // Si es un escaneo programado, se verifica que se haya establecido la fecha.
+        if (scheduled && !dateTime) {
+            alert('Por favor, seleccione una fecha y hora para el escaneo programado.');
+            return;
+        }
+
+        // Crear y llenar el objeto FormData.
+        let formData = new FormData();
+        formData.append('url', url);
+        formData.append('intensity', intensity);
+        formData.append('email', email);
+        formData.append('scheduled', scheduled);
+        if (scheduled) {
+            console.log("Fecha enviada:", dateTime);
+            formData.append('dateTime', dateTime);
+        }
+
+        enviarFormulario(formData);
+    });
+
+    // Función para enviar los datos usando jQuery ajax.
+    function enviarFormulario(formData) {
+        $.ajax({
+            url: '/process_scan',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data) {
+                if (data.status === 'success') {
+                    alert(data.message);
+                    $('#scanForm')[0].reset();
+                    $('#scheduleFields').addClass('d-none');
+                } else {
+                    alert('Error al guardar el escaneo: ' + data.message);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', xhr.responseJSON || error);
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    alert('Error: ' + xhr.responseJSON.message);
+                } else {
+                    alert('Hubo un error al procesar el escaneo.');
+                }
+            }
+        });
+    }
+});

@@ -14,6 +14,8 @@ from docx.oxml import OxmlElement
 from google import genai
 import time, json, os
 from dotenv import load_dotenv
+from extensions import db
+from models import Vulnerabilidades_totales
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -21,7 +23,11 @@ ZAP_API_KEY = os.getenv("ZAP_API_KEY")
 ZAP_URL = os.getenv("ZAP_URL")
 zap_url = ZAP_URL
 
-doc = Document(r"C:\Users\gizquierdog\Documents\custom_report\custom_report.docx")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REPORT_DIR = os.path.join(BASE_DIR, "reportes")
+os.makedirs(REPORT_DIR, exist_ok=True)
+template_path = os.path.join(REPORT_DIR, "custom_report.docx")
+doc = Document(template_path)
 
 def connect_zap():
     try:
@@ -53,7 +59,8 @@ def remplazar_encabezado(doc, remplazos):
                             cell.text = cell.text.replace(marcador, valor)
                             for paragraph in cell.paragraphs:
                                 paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-
+                                for run in paragraph.runs:
+                                    run.font.color.rgb = RGBColor(255, 255, 255) 
 
 def modificar_primer_tabla(doc, remplazos):
     tabla = doc.tables[0]  
@@ -106,8 +113,8 @@ def grafica_barras(vul_altas, vul_medias, vul_bajas, vul_informativas):
 
     plt.legend(loc='lower center', bbox_to_anchor=(0.5, -1.25), ncol=len(legend_labels), fontsize=30)
 
-    image_path = r"C:\Users\gizquierdog\Documents\custom_report\grafica_vulnerabilidades.png"
-
+    # image_path = ("./reportes/grafica_vulnerabilidades.png")
+    image_path = os.path.join(REPORT_DIR, "grafica_vulnerabilidades.png")
     # Guardar la gráfica como imagen
     plt.tight_layout()
     plt.savefig(image_path,bbox_inches='tight')
@@ -151,7 +158,8 @@ def agregar_alerta_tabla_6(doc, datos_alerta):
     tabla = doc.tables[6]
     # Agregar una nueva fila al final de la tabla
     nueva_fila = tabla.add_row()
-
+    
+    color_hex = "#FFFFFF"  
     # Completar las celdas de la nueva fila con los datos proporcionados
     celdas = nueva_fila.cells
     celdas[0].text = str(datos_alerta[0])  # Vulnerabilidad
@@ -174,7 +182,7 @@ def agregar_alerta_tabla_6(doc, datos_alerta):
 
     # Aplicar color de fondo a la celda
     celdas[3]._element.get_or_add_tcPr().append(parse_xml(
-        f'<w:shd {nsdecls("w")} w:fill="{color_hex.replace("#", "")}"/>'
+        f'<w:shd {nsdecls("w")} w:fill="{(color_hex or "#FFFFFF").replace("#", "")}"/>'
     ))
 
     for cell in nueva_fila.cells:
@@ -189,22 +197,34 @@ def agregar_alerta_tabla_6(doc, datos_alerta):
         ))
 def consulta_gemini(alert_name,alert_desc,alert_cwe):
     prompt_text = f"""
-    Eres un asistente especializado en ciberseguridad. Se te proporcionará el nombre de una alerta y su descripción.
+    Eres un asistente especializado en ciberseguridad. Se te proporcionará el nombre de una alerta, su descripción y CWE.
 
     Tu tarea:
+    En formato JSON, responde a las siguientes preguntas:
     Generar una nueva descripción clara y concisa de la alerta. (45-60 palabras)
     Identificar los posibles riesgos asociados a esta vulnerabilidad.(45-60 palabras)
     Proporcionar una solución para mitigar el problema.(45-60 palabras)
     Determinar el OWASP Top 10 correspondiente, únicamente basándote en el CWE asociado, Solo quiero el A01, A02...
-    Formato de salida (JSON):
-    json
-    "detalles": "",
-    "riesgo": "",
-    "solucion": "",
-    "owasp": ""
     alerta: {alert_name}
     descripcion: {alert_desc} 
-    CWE: {alert_cwe}"""
+    CWE: {alert_cwe}
+    EJEMPLO de salida JSON:
+    
+    {{"detalles": "los detalles oportunos",
+    "riesgo": "riesgo oportuno",
+    "solucion": "soluciones ",
+    "owasp": "A01"}}
+    """
+    schema = {
+    "type": "object",
+    "properties": {
+        "detalles":   {"type": "string"},
+        "riesgo":     {"type": "string"},
+        "solucion":   {"type": "string"},
+        "owasp":      {"type": "string"}
+    },
+    "required": ["detalles","riesgo","solucion","owasp"]
+    }
 
     client = genai.Client(api_key=GEMINI_API_KEY)
     try:
@@ -212,6 +232,8 @@ def consulta_gemini(alert_name,alert_desc,alert_cwe):
             model="gemini-2.0-flash", contents=prompt_text,
             config={
                 'response_mime_type': 'application/json',
+                "responseSchema": schema,
+                "temperature": 0,
             },
         )
         return json.loads(response.text)
@@ -219,12 +241,38 @@ def consulta_gemini(alert_name,alert_desc,alert_cwe):
         print(f"Error al obtener datos de la alerta: {e}")
         return {"descripcion": "", "riesgo": "", "solucion": "", "owasp": ""}
     
+def agragar_datos_owasp_vulneravilidades_totales(owaps_top_10):
+    vuln_totales = db.session.query(Vulnerabilidades_totales).first()
+    if owaps_top_10 == 'A01':
+        vuln_totales.a01 += 1
+    elif owaps_top_10 == 'A02':
+        vuln_totales.a02 += 1
+    elif owaps_top_10 == 'A03':
+        vuln_totales.a03 += 1
+    elif owaps_top_10 == 'A04':
+        vuln_totales.a04 += 1
+    elif owaps_top_10 == 'A05': 
+        vuln_totales.a05 += 1
+    elif owaps_top_10 == 'A06':
+        vuln_totales.a06 += 1
+    elif owaps_top_10 == 'A07':
+        vuln_totales.a07 += 1
+    elif owaps_top_10 == 'A08':
+        vuln_totales.a08 += 1
+    elif owaps_top_10 == 'A09':
+        vuln_totales.a09 += 1
+    elif owaps_top_10 == 'A10':
+        vuln_totales.a10 += 1
+    db.session.commit()
 
-
-def get_alertas(url):
-    zap = connect_zap()
-    alerts = zap.alert.alerts(url)
+def procesar_alertas(alerts,url,doc):
     risk_order = {"High": 1, "Medium": 2, "Low": 3, "Informational": 4}
+    risk_translation = {
+    "High": "Alto",
+    "Medium": "Medio",
+    "Low": "Bajo",
+    "Informational": "Informativo"
+    }
     alerts_sorted = sorted(alerts, key=lambda x: risk_order.get(x.get('risk', 'Informational'), 4))
     alertas_set = set()
     alertas_high_set = set()
@@ -236,41 +284,61 @@ def get_alertas(url):
     alertas_info =[]
     for alert in alerts_sorted:
         alert_name = alert.get('name')
-        if alert.get('risk') == 'High':
+        alert_risk = alert.get('risk')
+        if alert_risk == None:
+            alert_risk = alert.get('riskdesc')
+        alert_risk = alert_risk.lower()
+
+        if 'high'in alert_risk or 'alto' in alert_risk:
             alertas_high_set.add(alert_name)
-        elif alert.get('risk') == 'Medium':
+            risk_normalizado = 'High'
+        elif 'medium'in alert_risk or 'medio' in alert_risk:
             alertas_medium_set.add(alert_name)
-        elif alert.get('risk') == 'Low':
-            alertas_low_set.add(alert_name)    
-        elif alert.get('risk') == 'Informational':
+            risk_normalizado = 'Medium'
+        elif  'low' in alert_risk or 'bajo' in alert_risk:
+            alertas_low_set.add(alert_name)   
+            risk_normalizado = 'Low' 
+        elif 'informational' in alert_risk or 'informativo' in alert_risk:
             alertas_informational_set.add(alert_name)
+            risk_normalizado = 'Informational'
         
         if alert_name in alertas_set:
             continue
         
         alertas_set.add(alert_name)
-        alert_risk = alert.get('risk')
+        # alert_risk = alert.get('risk')
+        alert_risk_spanish = risk_translation.get(risk_normalizado, risk_normalizado)
         alertas_filtradas = [alerta for alerta in alerts if alerta['alert'] == alert_name]
         alert_count = len(alertas_filtradas)
         alert_desc = alert.get('desc')
         alert_cwe = alert.get('cweid')
         alert_references = alert.get('reference')
+        print(alert_count,alert_desc,alert_cwe,alert_risk,alert_risk_spanish)
         datos = consulta_gemini(alert_name,alert_desc,alert_cwe)
+        if isinstance(datos, list):
+            datos = datos[0] if datos else {}
         time.sleep(0.5)
+        print(datos, type(datos))
+        time.sleep(0.5)
+        owasp = datos.get("owasp", "")
+        detalles = datos.get("detalles", "")
+        riesgo  = datos.get("riesgo", "")
+        solucion = datos.get("solucion", "")
         alertas_info.append({
             'numero': f"{cont:02d}",
             'alert_name': alert_name,
-            'risk': alert_risk,
-            'owasp': datos['owasp'],  # Puedes ajustar esto según necesites
+            'risk': alert_risk_spanish,
+            'owasp': owasp, 
             'cwe': alert_cwe,
             'url': url,
-            'detalles': datos['detalles'],
-            'riesgo': datos['riesgo'],
-            'solucion': datos['solucion'],
+            'detalles': detalles,
+            'riesgo': riesgo,
+            'solucion': solucion,
             'referencias':alert_references
         })
+        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, owasp, alert_risk_spanish, "Detectada"]
+        agragar_datos_owasp_vulneravilidades_totales(datos_alerta[2])
         cont += 1
-        datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos['owasp'], alert_risk, "Detectada"]
         agregar_alerta_tabla_6(doc, datos_alerta)
     agregar_tablas_vulnerabilidades(doc,len(alertas_set))
     tabla_index = 8
@@ -280,6 +348,73 @@ def get_alertas(url):
     
     return  alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set
 
+def get_alertas(url):
+    zap = connect_zap()
+    alerts = zap.alert.alerts(url)
+    # risk_order = {"High": 1, "Medium": 2, "Low": 3, "Informational": 4}
+    # risk_translation = {
+    # "High": "Alto",
+    # "Medium": "Medio",
+    # "Low": "Bajo",
+    # "Informational": "Informativo"
+    # }
+    # alerts_sorted = sorted(alerts, key=lambda x: risk_order.get(x.get('risk', 'Informational'), 4))
+    # alertas_set = set()
+    # alertas_high_set = set()
+    # alertas_medium_set = set()
+    # alertas_low_set = set()
+    # alertas_informational_set = set()
+    # cont = 1
+    
+    # alertas_info =[]
+    # for alert in alerts_sorted:
+    #     alert_name = alert.get('name')
+    #     if alert.get('risk') == 'High':
+    #         alertas_high_set.add(alert_name)
+    #     elif alert.get('risk') == 'Medium':
+    #         alertas_medium_set.add(alert_name)
+    #     elif alert.get('risk') == 'Low':
+    #         alertas_low_set.add(alert_name)    
+    #     elif alert.get('risk') == 'Informational':
+    #         alertas_informational_set.add(alert_name)
+        
+    #     if alert_name in alertas_set:
+    #         continue
+        
+    #     alertas_set.add(alert_name)
+    #     alert_risk = alert.get('risk')
+    #     alert_risk_spanish = risk_translation.get(alert_risk, alert_risk)
+    #     alertas_filtradas = [alerta for alerta in alerts if alerta['alert'] == alert_name]
+    #     alert_count = len(alertas_filtradas)
+    #     alert_desc = alert.get('desc')
+    #     alert_cwe = alert.get('cweid')
+    #     alert_references = alert.get('reference')
+    #     datos = consulta_gemini(alert_name,alert_desc,alert_cwe)
+    #     time.sleep(0.5)
+    #     alertas_info.append({
+    #         'numero': f"{cont:02d}",
+    #         'alert_name': alert_name,
+    #         'risk': alert_risk_spanish,
+    #         'owasp': datos["owasp"], 
+    #         'cwe': alert_cwe,
+    #         'url': url,
+    #         'detalles': datos["detalles"],
+    #         'riesgo': datos["riesgo"],
+    #         'solucion': datos["solucion"],
+    #         'referencias':alert_references
+    #     })
+    #     datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos["owasp"], alert_risk_spanish, "Detectada"]
+    #     agragar_datos_owasp_vulneravilidades_totales(datos_alerta[2])
+    #     cont += 1
+    #     agregar_alerta_tabla_6(doc, datos_alerta)
+    # agregar_tablas_vulnerabilidades(doc,len(alertas_set))
+    # tabla_index = 8
+    # print(alertas_high_set,alertas_medium_set,alertas_low_set,alertas_informational_set)
+    # for i, alert_info in enumerate(alertas_info):
+    #     rellenar_tabla_vulnerabilidades(doc,tabla_index+i,alert_info)
+    
+    # return  alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set
+    return  procesar_alertas(alerts,url,doc)
 
 def rellenar_tabla_vulnerabilidades(doc,cont,alert_info):
     tabla = doc.tables[cont]
@@ -313,8 +448,10 @@ def agregar_tablas_vulnerabilidades(doc,n):
         tabla_original._element.addnext(salto_pagina)  
         salto_pagina.addnext(nueva_tabla) 
         
-    doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
-def contexto_resumen_ejecutivo(url, alertas_set, target_url):
+    #doc.save("./reportes/custom_report_modificado.docx")
+    output_path = os.path.join(REPORT_DIR, "custom_report_modificado.docx")
+    doc.save(output_path)
+def contexto_resumen_ejecutivo(url, alertas_set, target_url,doc):
     datos_json = alertas_set
     time.sleep(1)
     prompt_text = f"""
@@ -358,6 +495,8 @@ def contexto_resumen_ejecutivo(url, alertas_set, target_url):
 
 
 def generar_reporte_custom(target_url):
+    output_path = os.path.join(REPORT_DIR, "custom_report_modificado.docx")
+    
     remplazos = {
         "{nombre-url}": target_url,
         "{date}": datetime.now().strftime('%d/%m/%Y'),
@@ -365,12 +504,14 @@ def generar_reporte_custom(target_url):
     remplazar_texto(doc, remplazos)
     remplazar_encabezado(doc, remplazos)
     modificar_primer_tabla(doc, remplazos)
+    doc.save(output_path)
     alertas_set, high_set, medium_set, low_set, informational_set = get_alertas(target_url) 
-    contexto_resumen_ejecutivo(target_url, alertas_set, target_url)
+    contexto_resumen_ejecutivo(target_url, alertas_set, target_url,doc)
     imagen_path = grafica_barras(len(high_set), len(medium_set), len(low_set), len(informational_set))
     insertar_imagen_en_celda(doc, imagen_path, tabla_index=5, fila=1, columna=0)
-    doc.save(r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx")
+    #doc.save("./reportes/custom_report_modificado.docx")
+    doc.save(output_path)
     print("✅ Documento generado correctamente con gráfica insertada.")
-    doc_path = r"C:\Users\gizquierdog\Documents\custom_report\custom_report_modificado.docx"
-    return doc_path
+    #doc_path = ("./reportes/custom_report_modificado.docx")
+    return output_path
 
