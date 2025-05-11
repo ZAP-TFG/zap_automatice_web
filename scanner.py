@@ -14,7 +14,7 @@ from email import encoders
 from extensions import db
 from models import Escaneres_completados, Vulnerabilidades_totales, Reportes_vulnerabilidades_url
 from generate_report import generar_reporte_custom
-
+import urllib.parse
 
 
 logging.basicConfig(
@@ -145,6 +145,116 @@ def extract_vulnerabilities(zap, url, end_date):
     except Exception as e:
         logging.error(f"Error extracting vulnerabilities: {e}")
 
+def autentication_zap(zap,url):    
+    target_url = f"{url}/start.mvc?username=gabrito#lesson/WebGoatIntroduction.lesson"
+    login_url = f"{url}/login"
+    username_field = 'username'
+    password_field = 'password'
+    username = 'gabrito'
+    password = 'gabrito'
+    context_name = 'webgoat'
+    logged_in_indicator = 'Welcome gabrito!'
+    logged_out_indicator = 'Invalid username and password'
+    ZAP_URL = os.getenv("ZAP_URL")
+    proxies = {'http': ZAP_URL}
+
+    contexts = zap.context.context_list
+    if context_name in contexts:
+        info = zap.context.context(context_name)
+        context_id = int(info['id'])
+        print(f"Usando contexto existente: {context_name} (ID: {context_id})")
+    else:
+        context_id = zap.context.new_context(context_name)
+        print(f"Creado nuevo contexto: {context_name} (ID: {context_id})")
+
+    # Incluir todo el sitio en el contexto
+    zap.context.include_in_context(context_name, rf"{url}.*")
+
+    # --- Configurar autenticación de formulario ---
+    login_data = urllib.parse.quote_plus(
+        f"{username_field}={{%username%}}&{password_field}={{%password%}}"
+    )
+    auth_params = (
+        f"loginUrl={login_url}"
+        f"&loginRequestData={login_data}"
+    )
+    zap.authentication.set_authentication_method(
+        context_id,
+        'formBasedAuthentication',
+        auth_params
+    )
+    zap.authentication.set_logged_in_indicator(context_id, logged_in_indicator)
+    zap.authentication.set_logged_out_indicator(context_id, logged_out_indicator)
+    print("Método de autenticación configurado")
+
+    # --- Comprobar o crear usuario ---
+    user_id = None
+    for uid in zap.users.users_list(contextid=context_id):
+        user_info = zap.users.get_user_by_id(context_id, uid)
+        if user_info.get('name') == username:
+            user_id = uid
+            print(f"Usuario existente encontrado: {username} (ID: {user_id})")
+            break
+    if not user_id:
+        user_id = zap.users.new_user(context_id, username)
+        zap.users.set_user_enabled(context_id, user_id, True)
+        print(f"Nuevo usuario creado: {username} (ID: {user_id})")
+    # Establecer credenciales
+    zap.users.set_authentication_credentials(
+        context_id,
+        user_id,
+        f"{username_field}={username}&{password_field}={password}"
+    )
+    print("Credenciales de usuario configuradas")
+
+    # --- Modo usuario forzado ---
+    zap.forcedUser.set_forced_user(context_id, user_id)
+    zap.forcedUser.set_forced_user_mode_enabled(True)
+    print("Forced User Mode habilitado")
+
+    # --- Realizar login vía POST a través de ZAP proxy ---
+    print(f"Autenticando usuario {username} con POST al proxy de ZAP...")
+    try:
+        r = requests.post(
+            login_url,
+            data={username_field: username, password_field: password},
+            proxies=proxies,
+            allow_redirects=True
+        )
+        print(f"Login HTTP status: {r.status_code}")
+        # Esperar a que ZAP capture cookies
+        time.sleep(2)
+    except Exception as e:
+        print(f"Error durante POST de login: {e}")
+        
+
+    # --- Spider autenticado ---
+    print(f"Iniciando spider autenticado sobre {target_url}...")
+    scan_id = zap.spider.scan_as_user(
+        contextid=context_id,
+        userid=user_id,
+        url=target_url
+    )
+    # Monitorear progreso
+    while True:
+        pct = int(zap.spider.status(scan_id))
+        print(f"Spider progreso: {pct}%")
+        if pct >= 100:
+            break
+        time.sleep(2)
+    print("Spider completado")
+
+    # --- Esperar passive scan ---
+    print("Esperando passive scan...")
+    while int(zap.pscan.records_to_scan) > 0:
+        print(f"Pendientes passive scan: {zap.pscan.records_to_scan}")
+        time.sleep(2)
+    print("Passive scan completado")
+
+    # --- Active scan autenticado ---
+    print(f"Iniciando active scan autenticado sobre {target_url}...")
+   
+    return context_id, user_id, target_url
 
 def perform_scan(zap, url, strength):
     configure_scan_strength(zap, strength)
@@ -153,7 +263,12 @@ def perform_scan(zap, url, strength):
         db.session.add(scan)
         db.session.commit()
 
-        scan_id = zap.ascan.scan(url)
+        context_id, user_id, target_url = autentication_zap(zap,url)
+        scan_id =  zap.ascan.scan_as_user(
+        contextid=context_id,
+        userid=user_id,
+        url=target_url
+        )
         start_time = time.time()
         timeout = 10800
         while int(zap.ascan.status(scan_id)) < 100:
@@ -180,7 +295,7 @@ def perform_scan(zap, url, strength):
 
     except Exception as error:
         logging.error(f"Error during scan {url}: {error}")
-        exit(1)
+    
     
 
 
@@ -223,7 +338,7 @@ def send_email(zap, url, email):
 
     email_data = {
         "personalizations": [{"to": [{"email": email}], "subject": f"Escáner finalizado: {url}"}],
-        "from": {"email": "zapautomatic3@gmail.com"},
+        "from": {"email": "zapautomatic8@gmail.com"},
         "content": [{"type": "text/html", "value": email_content}],
         "attachments": [{
             "content": base64.b64encode(open(docx_path, "rb").read()).decode(),

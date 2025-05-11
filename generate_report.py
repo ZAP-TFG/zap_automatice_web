@@ -351,69 +351,6 @@ def procesar_alertas(alerts,url,doc):
 def get_alertas(url):
     zap = connect_zap()
     alerts = zap.alert.alerts(url)
-    # risk_order = {"High": 1, "Medium": 2, "Low": 3, "Informational": 4}
-    # risk_translation = {
-    # "High": "Alto",
-    # "Medium": "Medio",
-    # "Low": "Bajo",
-    # "Informational": "Informativo"
-    # }
-    # alerts_sorted = sorted(alerts, key=lambda x: risk_order.get(x.get('risk', 'Informational'), 4))
-    # alertas_set = set()
-    # alertas_high_set = set()
-    # alertas_medium_set = set()
-    # alertas_low_set = set()
-    # alertas_informational_set = set()
-    # cont = 1
-    
-    # alertas_info =[]
-    # for alert in alerts_sorted:
-    #     alert_name = alert.get('name')
-    #     if alert.get('risk') == 'High':
-    #         alertas_high_set.add(alert_name)
-    #     elif alert.get('risk') == 'Medium':
-    #         alertas_medium_set.add(alert_name)
-    #     elif alert.get('risk') == 'Low':
-    #         alertas_low_set.add(alert_name)    
-    #     elif alert.get('risk') == 'Informational':
-    #         alertas_informational_set.add(alert_name)
-        
-    #     if alert_name in alertas_set:
-    #         continue
-        
-    #     alertas_set.add(alert_name)
-    #     alert_risk = alert.get('risk')
-    #     alert_risk_spanish = risk_translation.get(alert_risk, alert_risk)
-    #     alertas_filtradas = [alerta for alerta in alerts if alerta['alert'] == alert_name]
-    #     alert_count = len(alertas_filtradas)
-    #     alert_desc = alert.get('desc')
-    #     alert_cwe = alert.get('cweid')
-    #     alert_references = alert.get('reference')
-    #     datos = consulta_gemini(alert_name,alert_desc,alert_cwe)
-    #     time.sleep(0.5)
-    #     alertas_info.append({
-    #         'numero': f"{cont:02d}",
-    #         'alert_name': alert_name,
-    #         'risk': alert_risk_spanish,
-    #         'owasp': datos["owasp"], 
-    #         'cwe': alert_cwe,
-    #         'url': url,
-    #         'detalles': datos["detalles"],
-    #         'riesgo': datos["riesgo"],
-    #         'solucion': datos["solucion"],
-    #         'referencias':alert_references
-    #     })
-    #     datos_alerta = [f"[VUL 0{cont}] {alert_name}", alert_count, datos["owasp"], alert_risk_spanish, "Detectada"]
-    #     agragar_datos_owasp_vulneravilidades_totales(datos_alerta[2])
-    #     cont += 1
-    #     agregar_alerta_tabla_6(doc, datos_alerta)
-    # agregar_tablas_vulnerabilidades(doc,len(alertas_set))
-    # tabla_index = 8
-    # print(alertas_high_set,alertas_medium_set,alertas_low_set,alertas_informational_set)
-    # for i, alert_info in enumerate(alertas_info):
-    #     rellenar_tabla_vulnerabilidades(doc,tabla_index+i,alert_info)
-    
-    # return  alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set
     return  procesar_alertas(alerts,url,doc)
 
 def rellenar_tabla_vulnerabilidades(doc,cont,alert_info):
@@ -509,9 +446,7 @@ def generar_reporte_custom(target_url):
     contexto_resumen_ejecutivo(target_url, alertas_set, target_url,doc)
     imagen_path = grafica_barras(len(high_set), len(medium_set), len(low_set), len(informational_set))
     insertar_imagen_en_celda(doc, imagen_path, tabla_index=5, fila=1, columna=0)
-    #doc.save("./reportes/custom_report_modificado.docx")
     doc.save(output_path)
     print("✅ Documento generado correctamente con gráfica insertada.")
-    #doc_path = ("./reportes/custom_report_modificado.docx")
     return output_path
 
