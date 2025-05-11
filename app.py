@@ -132,6 +132,7 @@ def home():
     """
     try:
         vul_totales = Vulnerabilidades_totales.query.first()
+        
         data = {
             "scans_completed": vul_totales.escaneos_totales if vul_totales else 0,
             "total_vulnerabilities": vul_totales.vul_all_totales if vul_totales else 0,
@@ -249,8 +250,7 @@ def process_scan():
         email = request.form.get('email')
         scheduled = request.form.get('scheduled', 'false').lower() == 'true'
         dateTime = request.form.get('dateTime')
-        #apiScan = request.form.get('apiScan', 'false').lower() == 'true'
-        #configFile = request.files.get('file')
+        
 
         # Validar datos obligatorios
         if not url or not intensity:
@@ -258,12 +258,6 @@ def process_scan():
 
         # Procesar archivo de configuración si existe
         config_data = None
-        # if configFile:
-        #     try:
-        #         config_data = json.loads(configFile.read().decode('utf-8'))
-        #     except Exception as e:
-        #         logging.error(f"Error al procesar el archivo de configuración: {e}")
-        #         return jsonify({'status': 'error', 'message': 'Archivo de configuración inválido.'}), 400
 
         # Escaneo programado
         if scheduled:
@@ -418,51 +412,7 @@ def descargar_reporte(filename):
         as_attachment=True,
         mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     )  
-# @app.route('/upload', methods=['GET', 'POST'])
-# @login_required
-# def upload_file():
-#     form = FileUploadForm()
-#     if form.validate_on_submit():
-#         file = form.file.data  # Obtiene el archivo subido
-#         from docx import Document
-#         doc = Document("./reportes/custom_report.docx")
-#         def proceso_gen_upload():
-#             with app.app_context():
-#                 json_data = json.load(file)
-#                 print(json_data)
-#                 url = json_data['site'][0]['@name']
-#                 alertas = json_data['site'][0]['alerts']
-#                 print(url)
-#                 for alert in alertas:
-#                     print(alert.get('alert'))
-                
-#                 remplazos = {
-#                     "{nombre-url}": json_data['site'][0]['@name'],
-#                     "{date}": datetime.now().strftime('%d/%m/%Y'),
-#                 }
-#                 remplazar_texto(doc,remplazos)
-#                 remplazar_encabezado(doc,remplazos)
-#                 modificar_primer_tabla(doc,remplazos)
-#                 alertas_set, alertas_high_set, alertas_medium_set, alertas_low_set, alertas_informational_set = procesar_alertas(alertas,url,doc)
-#                 contexto_resumen_ejecutivo(url, alertas_set, url,doc)
-#                 output_filename = "custom_report_modificado.docx"
-#                 output_path = os.path.join(current_app.root_path, "reportes", output_filename)
-#                 doc.save(output_path)
-#                 #doc.save("./reportes/custom_report_modificado.docx")
-#                 return send_from_directory(
-#                     directory=os.path.join(current_app.root_path, "reportes"),
-#                     path=output_filename,
-#                     as_attachment=True,
-#                     mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-#                 )
-               
-#         try:
-#             Thread(target=proceso_gen_upload).start()
 
-#         except json.JSONDecodeError:
-#             print("El archivo no contiene un JSON válido.", 'danger')
-
-#     return render_template('generate_report.html', form=form)
 
 @app.route('/scan_progress', methods=['GET'])
 @login_required

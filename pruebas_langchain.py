@@ -40,7 +40,7 @@ def comparar_reportes(user_input, report_str):
         """
         
 
-    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model="gemini-2.0-flash", contents=prompt_text
     )
@@ -82,7 +82,7 @@ def vulnerabilidades(user_input: str) -> str:
     """
     
     # Llamar al modelo Gemini para generar la consulta SQL
-    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model="gemini-2.0-flash", contents=prompt_text
     )
@@ -131,7 +131,7 @@ def consultar_escaneres_programados(input: str) -> str:
     """
     
     # Llamar al modelo Gemini para generar la consulta SQL
-    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model="gemini-2.0-flash", contents=prompt_text
     )
@@ -167,7 +167,7 @@ def resumenes_comparacion(user_input: str) -> str:
         """
     
 
-    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model="gemini-2.0-flash", contents=prompt_text
     )
@@ -219,7 +219,7 @@ def consultar_escaneres_ejecutandose(input: str) -> str:
     """
     
     # Llamar al modelo Gemini para generar la consulta SQL
-    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model="gemini-2.0-flash", contents=prompt_text
     )
@@ -274,7 +274,7 @@ def ejecutar_escaner(user_input: str) -> str:
     Si no puedes encontrar la información, devuelve un JSON vacío:.
     """
 
-    client = genai.Client(api_key="AIzaSyAcSiAiJ-OpQPHRUh0YWnIZ02KAt3pGOOY")
+    client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model="gemini-2.0-flash", 
         contents=prompt_text,
@@ -372,14 +372,4 @@ graph_memory = graph_builder.compile(checkpointer=memory) #checkpoint es el comp
 Definimos el diccionario configuración en que decimos que queremos tener un único hilo de conversación."""
 config = {"configurable": {"thread_id": "1"}}
 
-"""
-while True:
-    user_input = input("User: ")
-    if user_input.lower() in ["quit", "q"]:
-        print("Goodbye!")
-        break
-    events = graph_memory.stream(
-        {"messages": [("user", user_input)]}, config, stream_mode="values"
-    )
-    for event in events:
-        event["messages"][-1].pretty_print()"""
+
