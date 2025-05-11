@@ -5,7 +5,7 @@ $(document).ready(function() {
     $('#vulnerabilitiesForm').on('submit', function(event) {
         event.preventDefault(); 
 
-        var url = $('#scanUrl').val(); 
+        const url = $('#scanUrl').val(); 
 
         if (!url) {
             alert("Por favor, introduce una URL.");
@@ -85,8 +85,8 @@ $(document).ready(function() {
             data: { url: url },
             success: function(response) {
                 // Mostrar la comparativa en el contenedor
-                var convert = new showdown.Converter();
-                var html = convert.makeHtml(response.comparativa)
+                const convert = new showdown.Converter();
+                const html = convert.makeHtml(response.comparativa)
                 $('#chatgptResponse').html(html);
             },
             error: function(xhr) {
