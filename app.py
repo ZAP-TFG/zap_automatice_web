@@ -18,7 +18,7 @@ from models import (
     Vulnerabilidades_totales,
 )
 from forms import ScanForm, ChatForm, FileUploadForm
-from langchain import graph_memory
+from langchain_langraph import graph_memory
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from threading import Thread
