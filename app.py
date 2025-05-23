@@ -59,7 +59,7 @@ migrate = Migrate(app, db)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["2000000000 per day", "5000000000 per hour"]
+    default_limits=["20000 per day", "5000 per hour"]
 )
 # Constantes
 DATE_FORMAT = '%Y-%m-%dT%H:%M'
@@ -74,6 +74,7 @@ def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Content-Security-Policy'] = "default-src * data: blob: filesystem: 'unsafe-inline' 'unsafe-eval'; img-src * data: blob:;"
+
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     response.headers['Pragma'] = 'no-cache'
