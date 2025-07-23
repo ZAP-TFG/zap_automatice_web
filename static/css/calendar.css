@@ -1,14 +1,301 @@
+/* Variables CSS */
+:root {
+    --primary-color: #FF2778;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    --white: #ffffff;
+    --border-radius: 12px;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+    --gradient-primary: linear-gradient(135deg, var(--primary-color), #001a35);
+}
+
+/* Contenedor Principal */
+.calendar-container {
+    max-width: 1500px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.calendar-wrapper {
+    background: var(--white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+/* Header del Calendario */
+.calendar-header {
+    padding: 2rem;
+    background: var(--gradient-primary);
+    color: var(--white);
+    text-align: center;
+}
+
+.calendar-title {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.calendar-subtitle {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 1rem;
+}
+
+/* Calendario Principal */
+.calendar-main {
+    padding: 2rem;
+}
+
 #calendar {
-    max-width: 80%;
-    margin: 0 auto; 
-    height: 850px; 
+    max-width: 100%;
+    margin: 0 auto;
+    height: 700px;
 }
-.modal-header{
-    background-color: #f8f9fa; 
-    color: #000000; 
-    border-bottom: 1px solid #ddd;
+
+/* Personalización de FullCalendar */
+.fc {
+    font-family: inherit;
 }
-.modal-body{
-    background-color: #f8f9fa; 
-    color: #000000;
+
+.fc-header-toolbar {
+    margin-bottom: 1.5rem !important;
+}
+
+.fc-toolbar-title {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    color: var(--dark-color) !important;
+}
+
+.fc-button {
+    background: var(--primary-color) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 0.5rem 1rem !important;
+    transition: var(--transition) !important;
+}
+
+.fc-button:hover {
+    background: #001a35 !important;
+    transform: translateY(-1px) !important;
+}
+
+.fc-button:disabled {
+    opacity: 0.5 !important;
+}
+
+.fc-event {
+    border-radius: 6px !important;
+    border: none !important;
+    padding: 0.25rem 0.5rem !important;
+    margin: 0.125rem 0 !important;
+    cursor: pointer !important;
+    transition: var(--transition) !important;
+}
+
+.fc-event:hover {
+    transform: scale(1.02) !important;
+}
+
+/* Estilos para eventos completados */
+.fc-event[class*="completed"] {
+    background: var(--success-color) !important;
+    color: var(--white) !important;
+}
+
+/* Estilos para eventos programados */
+.fc-event[class*="scheduled"] {
+    background: var(--warning-color) !important;
+    color: var(--dark-color) !important;
+}
+
+.fc-daygrid-day {
+    transition: var(--transition) !important;
+}
+
+.fc-daygrid-day:hover {
+    background: rgba(0, 48, 89, 0.05) !important;
+}
+
+.fc-today {
+    background: rgba(0, 48, 89, 0.1) !important;
+}
+
+/* Leyenda */
+.calendar-legend {
+    padding: 2rem;
+    background: var(--light-color);
+    border-top: 1px solid #e9ecef;
+}
+
+.legend-title {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dark-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.legend-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.legend-color.completed {
+    background: var(--success-color);
+}
+
+.legend-color.scheduled {
+    background: var(--warning-color);
+}
+
+.legend-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.legend-text strong {
+    color: var(--dark-color);
+    margin-bottom: 0.25rem;
+}
+
+.legend-text small {
+    color: var(--secondary-color);
+    font-size: 0.85rem;
+}
+
+/* Modal Mejorado */
+.modal-content {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.modal-header {
+    background: var(--gradient-primary);
+    color: var(--white) !important;
+    border-bottom: none;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.modal-title {
+    font-weight: 600;
+    color: var(--white) !important;
+}
+
+/* Modal - Texto negro para mejor legibilidad */
+.modal-body {
+    padding: 2rem;
+    background: var(--white);
+    color: #000000 !important;
+}
+
+.modal-body p {
+    color: #000000 !important;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.modal-body strong {
+    color: #000000 !important;
+    font-weight: 600;
+}
+
+/* Asegurar que todo el contenido del modal sea negro */
+#eventDetailsContent {
+    color: #000000 !important;
+}
+
+#eventDetailsContent p {
+    color: #000000 !important;
+    line-height: 1.5;
+}
+
+#eventDetailsContent strong {
+    color: #000000 !important;
+    font-weight: 600;
+}
+
+.modal-footer {
+    background: var(--light-color);
+    border-top: 1px solid #e9ecef;
+    color: #000000 !important;
+}
+
+.modal-footer .btn {
+    border-radius: 6px;
+    padding: 0.5rem 1.25rem;
+}
+
+.modal-footer .btn-secondary {
+    color: #000000 !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .calendar-container {
+        margin: 1rem auto;
+        padding: 0 0.5rem;
+    }
+    
+    .calendar-header {
+        padding: 1.5rem 1rem;
+    }
+    
+    .calendar-main {
+        padding: 1rem;
+    }
+    
+    .calendar-title {
+        font-size: 1.4rem;
+    }
+    
+    .calendar-subtitle {
+        font-size: 0.9rem;
+    }
+    
+    #calendar {
+        height: 500px;
+    }
+    
+    .legend-items {
+        grid-template-columns: 1fr;
+    }
+    
+    .fc-toolbar-title {
+        font-size: 1.2rem !important;
+    }
 }

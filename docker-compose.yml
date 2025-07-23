@@ -1,4 +1,3 @@
-
 services:
   db:
     image: postgres:13
@@ -35,7 +34,7 @@ services:
       
     volumes:
       - ./reportes:/app/reportes
-
+      - shared_yaml_files:/zap/yaml_files  
 
   web:
     build: .
@@ -56,6 +55,7 @@ services:
       - PSQL_PORT=5432
       - PSQL_USER=${PSQL_USER}
       - PSQL_PASSWORD=${PSQL_PASSWORD}
+      - DB_NAME=${DB_NAME}
     depends_on:
       db:
         condition: service_healthy
@@ -65,5 +65,8 @@ services:
     volumes:
       - ./reportes:/app/reportes
       - ./data:/app/data
+      - shared_yaml_files:/app/uploads/yaml_files  
+
 volumes:
   pgdata:
+  shared_yaml_files:  

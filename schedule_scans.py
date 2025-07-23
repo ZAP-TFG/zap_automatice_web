@@ -4,7 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from extensions import *
 from models import *
 from datetime import datetime
-from scanner import connect_to_zap, add_url_to_sites, perform_scan, send_email
+from scanner import connect_to_zap, add_url_to_sites, perform_scan, send_email, perform_plan_automation
 import logging
 import os
 import threading
@@ -106,7 +106,7 @@ def execute_scan(scan_id):
         with app.app_context():
            
             scan = db.session.query(Escaneo_programados).get(scan_id)
-            if scan:
+            if scan and scan.tipo_escaneo == 'basic':
                 target_url = scan.target_url
                 intensidad = scan.intensidad
                 scan.estado = "EN PROCESO"
@@ -124,8 +124,27 @@ def execute_scan(scan_id):
 
                 # Enviar correo al finalizar el escaneo
                 send_email(zap, scan.target_url, scan.email if hasattr(scan, 'email') else None)
+            
+            elif scan and scan.tipo_escaneo == 'plan':
+                
+                target_url = scan.target_url
+                file_path_complete = scan.archivo_yaml_ruta
+                email = scan.email if hasattr(scan, 'email') else None
+                scan.estado = "EN PROCESO"
+                db.session.commit()
+                logging.info(f"Comenzando escaneo planificado para {target_url} con archivo YAML {file_path_complete}.")
+
+                zap = connect_to_zap()
+                add_url_to_sites(zap, target_url)
+                perform_plan_automation(zap, target_url, file_path_complete, email)
+
+                scan.estado = 'COMPLETADO'
+                db.session.commit()
+                send_email(zap, scan.target_url, scan.email if hasattr(scan, 'email') else None)
+                logging.info(f"Escaneo planificado {scan_id} completado exitosamente.")
             else:
-                logging.warning(f"Escaneo con ID {scan_id} no encontrado.")
+                logging.warning(f"Escaneo con ID {scan_id} no encontrado o tipo de escaneo no válido.")
+            
 
     except Exception as e:
         with app.app_context():

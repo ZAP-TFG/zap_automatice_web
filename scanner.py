@@ -9,12 +9,13 @@ from datetime import datetime
 from dotenv import load_dotenv
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
+from email.mime.application import MIMEApplication
 from email import encoders
 from extensions import db
+import smtplib
 from models import Escaneres_completados, Vulnerabilidades_totales, Reportes_vulnerabilidades_url
 from generate_report import generar_reporte_custom
-import urllib.parse
+
 
 
 logging.basicConfig(
@@ -93,6 +94,166 @@ def generate_report(zap, url):
         logging.error(f"Error generating or reading report: {str(e)}")
         return None
 
+def generar_reporte_custom_tabla_url(zap, url):
+    try:
+    # Configuración de ZAP
+
+        end_date = datetime.now()
+
+        # PASO 1: Generar el reporte JSON desde ZAP
+        report_dir = "/app/reportes"
+        if not os.path.exists(report_dir):
+            os.makedirs(report_dir)
+
+        report_filename = 'Reporte_vulnerabilidades_otro.json'
+        filepath = os.path.join(report_dir, report_filename)
+
+        zap.reports.generate(
+            title="report_json",
+            template="traditional-json",
+            sites=url,
+            reportdir=report_dir,
+            reportfilename=report_filename
+        )
+
+        # Cargar el reporte generado
+        with open(filepath, 'r', encoding='utf-8') as file:
+            json_data = json.load(file)
+
+        # Eliminar el archivo temporal
+        os.remove(filepath)
+
+        # PASO 2: Buscar el sitio objetivo en el reporte
+        target_host = "cfrsxnrtpre.cofares.es"
+        site_data = None
+
+        for site in json_data.get('site', []):
+            if site.get('@host') == target_host:
+                site_data = site
+                break
+
+        if not site_data:
+            print(f"❌ No se encontró el sitio {target_host} en el reporte")
+            exit()
+
+        # PASO 3: Procesar las alertas del JSON
+        alerts = site_data.get('alerts', [])
+
+        # Configuración para ordenar y traducir riesgos
+        risk_translation = {
+            "High": "Alto",
+            "Medium": "Medio", 
+            "Low": "Bajo",
+            "Informational": "Informativo"
+        }
+
+        # Conjuntos para evitar duplicados
+        alertas_set = set()
+
+        # Estructura para JSON agrupado por riesgo
+        alertas_por_riesgo = {
+            "high": [],
+            "medium": [],
+            "low": [],
+            "informational": []
+        }
+
+        for alert in alerts:
+            alert_name = alert.get('name', alert.get('alert', ''))
+            
+            # Extraer nivel de riesgo del riskdesc
+            riskdesc = alert.get('riskdesc', 'Informational')
+            
+            # Normalizar nivel de riesgo desde riskdesc
+            if 'Alto' in riskdesc or 'High' in riskdesc:
+                risk_normalizado = 'High'
+                risk_key = 'high'
+            elif 'Medio' in riskdesc or 'Medium' in riskdesc:
+                risk_normalizado = 'Medium'
+                risk_key = 'medium'
+            elif 'Bajo' in riskdesc or 'Low' in riskdesc:
+                risk_normalizado = 'Low'
+                risk_key = 'low'
+            else:
+                risk_normalizado = 'Informational'
+                risk_key = 'informational'
+            
+            # Evitar duplicados
+            if alert_name in alertas_set:
+                continue
+            
+            alertas_set.add(alert_name)
+            
+            # PASO 4: Extraer attack y evidence de las instances
+            attack = ""
+            evidence = ""
+            
+            instances = alert.get('instances', [])
+            if instances:
+                # Tomar de la primera instancia que tenga datos
+                for instance in instances:
+                    if not attack and instance.get('attack'):
+                        attack = instance.get('attack', '')
+                    if not evidence and instance.get('evidence'):
+                        evidence = instance.get('evidence', '')
+                    # Si ya tenemos ambos, no necesitamos seguir buscando
+                    if evidence and attack:
+                        break
+                
+                # Si no encontramos attack/evidence, tomar de la primera instancia
+                if not attack and not evidence and instances:
+                    first_instance = instances[0]
+                    attack = first_instance.get('attack', '')
+                    evidence = first_instance.get('evidence', '')
+            
+            # Contar todas las instancias de esta alerta
+            count = len(instances)
+            
+            # Crear datos de la alerta
+            alerta_data = {
+                "name": alert_name,
+                "confidence": alert.get('confidence', ''),
+                "riskdesc": alert.get('riskdesc', risk_normalizado),
+                "risk_spanish": risk_translation.get(risk_normalizado, risk_normalizado),
+                "desc": alert.get('desc', ''),
+                "cweid": alert.get('cweid', ''),
+                "reference": alert.get('reference', ''),
+                "count": count,
+                "attack": attack,
+                "evidence": evidence
+            }
+            
+            # Agregar a la categoría correspondiente
+            alertas_por_riesgo[risk_key].append(alerta_data)
+
+        # PASO 5: Crear JSON final procesado
+        custom_report_file = {
+            "target_url": site_data.get('@name', url),
+            "target_host": site_data.get('@host', ''),
+            "scan_date": end_date.isoformat(),
+            "zap_version": json_data.get('@version', ''),
+            "generated": json_data.get('@generated', ''),
+            "total_alerts": len(alertas_set),
+            "summary": {
+                "high": len(alertas_por_riesgo["high"]),
+                "medium": len(alertas_por_riesgo["medium"]),
+                "low": len(alertas_por_riesgo["low"]),
+                "informational": len(alertas_por_riesgo["informational"])
+            },
+            "alertas": alertas_por_riesgo
+        }
+
+        # PASO 6: Guardar en la base de datos
+        scan_url = Reportes_vulnerabilidades_url(target_url=url, report_file=custom_report_file)
+        db.session.add(scan_url)
+        db.session.commit()
+
+        # print(f"✅ Reporte procesado y guardado en base de datos para {url}")
+        # print(f"Total alertas únicas procesadas: {len(alertas_set)}")
+        # print(f"Alto: {len(alertas_por_riesgo['high'])}, Medio: {len(alertas_por_riesgo['medium'])}, Bajo: {len(alertas_por_riesgo['low'])}, Info: {len(alertas_por_riesgo['informational'])}")
+    except Exception as e:
+        logging.error(f"❌ Error procesando el reporte y creando el nuevo: {e}")
+        
 
 def update_total_vulnerabilities(high, medium, low, info):
     try:
@@ -145,116 +306,6 @@ def extract_vulnerabilities(zap, url, end_date):
     except Exception as e:
         logging.error(f"Error extracting vulnerabilities: {e}")
 
-def autentication_zap(zap,url):    
-    target_url = f"{url}/start.mvc?username=gabrito#lesson/WebGoatIntroduction.lesson"
-    login_url = f"{url}/login"
-    username_field = 'username'
-    password_field = 'password'
-    username = 'gabrito'
-    password = 'gabrito'
-    context_name = 'webgoat'
-    logged_in_indicator = 'Welcome gabrito!'
-    logged_out_indicator = 'Invalid username and password'
-    ZAP_URL = os.getenv("ZAP_URL")
-    proxies = {'http': ZAP_URL}
-
-    contexts = zap.context.context_list
-    if context_name in contexts:
-        info = zap.context.context(context_name)
-        context_id = int(info['id'])
-        print(f"Usando contexto existente: {context_name} (ID: {context_id})")
-    else:
-        context_id = zap.context.new_context(context_name)
-        print(f"Creado nuevo contexto: {context_name} (ID: {context_id})")
-
-    # Incluir todo el sitio en el contexto
-    zap.context.include_in_context(context_name, rf"{url}.*")
-
-    # --- Configurar autenticación de formulario ---
-    login_data = urllib.parse.quote_plus(
-        f"{username_field}={{%username%}}&{password_field}={{%password%}}"
-    )
-    auth_params = (
-        f"loginUrl={login_url}"
-        f"&loginRequestData={login_data}"
-    )
-    zap.authentication.set_authentication_method(
-        context_id,
-        'formBasedAuthentication',
-        auth_params
-    )
-    zap.authentication.set_logged_in_indicator(context_id, logged_in_indicator)
-    zap.authentication.set_logged_out_indicator(context_id, logged_out_indicator)
-    print("Método de autenticación configurado")
-
-    # --- Comprobar o crear usuario ---
-    user_id = None
-    for uid in zap.users.users_list(contextid=context_id):
-        user_info = zap.users.get_user_by_id(context_id, uid)
-        if user_info.get('name') == username:
-            user_id = uid
-            print(f"Usuario existente encontrado: {username} (ID: {user_id})")
-            break
-    if not user_id:
-        user_id = zap.users.new_user(context_id, username)
-        zap.users.set_user_enabled(context_id, user_id, True)
-        print(f"Nuevo usuario creado: {username} (ID: {user_id})")
-    # Establecer credenciales
-    zap.users.set_authentication_credentials(
-        context_id,
-        user_id,
-        f"{username_field}={username}&{password_field}={password}"
-    )
-    print("Credenciales de usuario configuradas")
-
-    # --- Modo usuario forzado ---
-    zap.forcedUser.set_forced_user(context_id, user_id)
-    zap.forcedUser.set_forced_user_mode_enabled(True)
-    print("Forced User Mode habilitado")
-
-    # --- Realizar login vía POST a través de ZAP proxy ---
-    print(f"Autenticando usuario {username} con POST al proxy de ZAP...")
-    try:
-        r = requests.post(
-            login_url,
-            data={username_field: username, password_field: password},
-            proxies=proxies,
-            allow_redirects=True
-        )
-        print(f"Login HTTP status: {r.status_code}")
-        # Esperar a que ZAP capture cookies
-        time.sleep(2)
-    except Exception as e:
-        print(f"Error durante POST de login: {e}")
-        
-
-    # --- Spider autenticado ---
-    print(f"Iniciando spider autenticado sobre {target_url}...")
-    scan_id = zap.spider.scan_as_user(
-        contextid=context_id,
-        userid=user_id,
-        url=target_url
-    )
-    # Monitorear progreso
-    while True:
-        pct = int(zap.spider.status(scan_id))
-        print(f"Spider progreso: {pct}%")
-        if pct >= 100:
-            break
-        time.sleep(2)
-    print("Spider completado")
-
-    # --- Esperar passive scan ---
-    print("Esperando passive scan...")
-    while int(zap.pscan.records_to_scan) > 0:
-        print(f"Pendientes passive scan: {zap.pscan.records_to_scan}")
-        time.sleep(2)
-    print("Passive scan completado")
-
-    # --- Active scan autenticado ---
-    print(f"Iniciando active scan autenticado sobre {target_url}...")
-   
-    return context_id, user_id, target_url
 
 def perform_scan(zap, url, strength):
     configure_scan_strength(zap, strength)
@@ -263,12 +314,7 @@ def perform_scan(zap, url, strength):
         db.session.add(scan)
         db.session.commit()
 
-        context_id, user_id, target_url = autentication_zap(zap,url)
-        scan_id =  zap.ascan.scan_as_user(
-        contextid=context_id,
-        userid=user_id,
-        url=target_url
-        )
+        scan_id = zap.ascan.scan(url)
         start_time = time.time()
         timeout = 10800
         while int(zap.ascan.status(scan_id)) < 100:
@@ -286,18 +332,66 @@ def perform_scan(zap, url, strength):
         scan.fecha_fin = datetime.now()
         scan.report_file = generate_report(zap, url)
         scan.estado = "COMPLETADO"
-        
         db.session.commit()
 
         extract_vulnerabilities(zap, url, scan.fecha_fin)
-
+        generar_reporte_custom_tabla_url(zap, url)
         return scan_id
 
     except Exception as error:
         logging.error(f"Error during scan {url}: {error}")
-    
-    
+        exit(1)
 
+def perform_plan_automation(zap,url,file_path, email):
+    """
+    Ejecuta un plan de automatización en ZAP.
+    """
+    try:
+        api_url = os.getenv("ZAP_URL")
+        api_key = os.getenv("ZAP_API_KEY")
+        headers = {
+            'Accept': 'application/json'
+        }
+
+        file_path_complete =  f"/zap/yaml_files/{file_path}" 
+
+        r = requests.get(f'{api_url}/JSON/automation/action/runPlan/', params={
+            'apikey': api_key,
+            'filePath': file_path_complete
+        }, headers=headers)
+        planID = r.json().get('planId')
+        if not planID:
+            logging.error("No se pudo obtener el ID del plan de automatización.\n")
+        logging.info(f"Ejecutandose el plan: {planID}")
+
+        scan = Escaneres_completados(target_url=url, estado="En proceso", fecha_inicio=datetime.now(), progreso = 0, yaml_file_path=file_path_complete, email=email)
+        db.session.add(scan)
+        db.session.commit()
+        while True:
+            headers = {
+                'Accept': 'application/json'
+            }
+
+            r = requests.get(f'{api_url}/JSON/automation/view/planProgress/', params={
+            'planId': planID, 'apikey': api_key}, 
+            headers = headers)
+            json_parsed = r.json()
+            if json_parsed.get('finished') == '':
+                logging.info(f"Plan ID: {planID} - en progreso.\n")
+            else:
+                logging.info(f"Plan ID: {planID} - finalizado.\n")
+                break
+            time.sleep(2)
+
+        scan.fecha_fin = datetime.now()
+        scan.report_file = generate_report(zap, url)
+        scan.estado = "COMPLETADO"
+        db.session.commit()
+        extract_vulnerabilities(zap, url, scan.fecha_fin)
+            
+    except Exception as e:
+        logging.error(f"Error executing automation plan: {e}")
+        exit(1)
 
 
 def send_email(zap, url, email):
@@ -312,6 +406,7 @@ def send_email(zap, url, email):
         if alert_risk in vul_dict:
             vul_dict[alert_risk].add(alert_name)
 
+    # Crear contenido HTML
     email_content = f"""
     <html>
         <body>
@@ -334,26 +429,37 @@ def send_email(zap, url, email):
 
     email_content += "</body></html>"
 
-    sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
+    # Configurar email
+    sender_address = "vulnstorm@cofares.es"
+    receiver_address = email
 
-    email_data = {
-        "personalizations": [{"to": [{"email": email}], "subject": f"Escáner finalizado: {url}"}],
-        "from": {"email": "zapautomatic8@gmail.com"},
-        "content": [{"type": "text/html", "value": email_content}],
-        "attachments": [{
-            "content": base64.b64encode(open(docx_path, "rb").read()).decode(),
-            "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "filename": os.path.basename(docx_path)
-        }]
-    }
+    message = MIMEMultipart()
+    message['From'] = sender_address
+    message['To'] = receiver_address
+    message['Subject'] = f'Escaner Finalizado para: {url}'
 
-    headers = {"Authorization": f"Bearer {sendgrid_api_key}", "Content-Type": "application/json"}
+    # Adjuntar HTML
+    message.attach(MIMEText(email_content, 'html'))
 
-    response = requests.post("https://api.sendgrid.com/v3/mail/send", headers=headers, data=json.dumps(email_data))
+    # Adjuntar documento .docx
+    try:
+        with open(docx_path, "rb") as doc_file:
+            attachment = MIMEApplication(doc_file.read(), _subtype="vnd.openxmlformats-officedocument.wordprocessingml.document")
+            attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(docx_path))
+            message.attach(attachment)
+    except Exception as e:
+        logging.error(f"No se pudo adjuntar el documento: {e}")
+        return
 
-    if response.status_code == 202:
+    # Enviar correo vía SMTP relay
+    try:
+        session = smtplib.SMTP('192.0.1.252', 25)
+        session.sendmail(sender_address, [receiver_address], message.as_string())
+        session.quit()
         logging.info("Correo enviado con éxito.")
-    else:
-        logging.error(f"Error al enviar correo: {response.status_code} - {response.text}")
+    except Exception as e:
+        logging.error(f"Error al enviar correo: {e}")
+
+
 
 

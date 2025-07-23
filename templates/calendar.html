@@ -2,30 +2,53 @@
 
 {% block content %}
 <link rel="stylesheet" href="/static/css/calendar.css">
-<div class="row my-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title">Scan Schedule</h3>
-                <div id="calendar"></div>
-                
-                <!-- Leyenda del calendario -->
-                <div class="calendar-legend" style="margin-top: 15px; text-align: center;">
-                  <span style="display: inline-block; margin-right: 20px;">
-                    <span style="display: inline-block; width: 15px; height: 15px; background-color: #28a745; margin-right: 5px;"></span>
-                    Escaneos Completados
-                  </span>
-                  <span style="display: inline-block;">
-                    <span style="display: inline-block; width: 15px; height: 15px; background-color: #ffc107; margin-right: 5px;"></span>
-                    Escaneos Programados
-                  </span>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<div class="calendar-container">
+    <div class="calendar-wrapper">
+        <!-- Header Profesional -->
+        <div class="calendar-header">
+            <div class="header-content">
+                <h2 class="calendar-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    Calendario de Escaneos
+                </h2>
+                <p class="calendar-subtitle">Programa y revisa tus escaneos de seguridad</p>
+            </div>
+        </div>
+
+        <!-- Calendario Principal -->
+        <div class="calendar-main">
+            <div id="calendar"></div>
+        </div>
+
+        <!-- Leyenda -->
+        <div class="calendar-legend">
+            <h4 class="legend-title">
+                <i class="fas fa-info-circle"></i>
+                Leyenda
+            </h4>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color completed"></div>
+                    <span class="legend-text">
+                        <strong>Escaneos Completados</strong>
+                        <small>Escaneos finalizados con resultados disponibles</small>
+                    </span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color scheduled"></div>
+                    <span class="legend-text">
+                        <strong>Escaneos Programados</strong>
+                        <small>Escaneos pendientes de ejecución</small>
+                    </span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal para mostrar detalles del evento -->
+<!-- Modal Original -->
 <div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -34,7 +57,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="eventDetailsContent">
-                <!-- Aquí se mostrarán los detalles con JavaScript -->
+                <!-- Contenido dinámico -->
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

@@ -29,13 +29,11 @@ class Escaneres_completados(db.Model):
     estado = db.Column(db.String(50), nullable=False)
     fecha_inicio = db.Column(db.DateTime(timezone=True), default=get_utc_now)
     fecha_fin = db.Column(db.DateTime(timezone=True), default=get_utc_now)
-    intensidad = db.Column(db.String(50), nullable=False, default='DEFAULT')
+    intensidad = db.Column(db.String(50), nullable=True, default='DEFAULT')
     progreso = db.Column(db.Integer, default=0)
-    #report_file = db.Column(JSON, nullable=True) # recoger alertas que umbral medio/alto
-
-    __table_args__ = (
-        Index('idx_target_url_estado', 'target_url', 'estado'),
-    )
+    email = db.Column(db.String(120), nullable=True)
+    yaml_file_path = db.Column(db.String(500), nullable=True)
+    
 
 class Vulnerabilidades_totales(db.Model):
     __tablename__ = 'vulnerabilidades_totales'  
@@ -79,14 +77,12 @@ class Escaneo_programados(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     target_url = db.Column(db.String(200), nullable=False, index=True)
-    intensidad = db.Column(db.String(50), nullable=False, default='DEFAULT')
+    intensidad = db.Column(db.String(50), nullable=True, default='DEFAULT')
     fecha_programada = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
     estado = db.Column(db.String(50), nullable=False, default='PENDIENTE')
-    archivo_subido = db.Column(db.String(200), nullable=True)
-    api_scan = db.Column(db.Boolean, default=False)
-    api_file = db.Column(JSON, nullable=True)
+    archivo_yaml_ruta = db.Column(db.String(20000), nullable=True)
     email = db.Column(db.String(120), nullable=True, server_default='gizquierdog@cofares.es')
-    periodicidad_dias = db.Column(db.Integer, default=0)
+    tipo_escaneo = db.Column(db.String(50), nullable=False, default='basic')
 
     __table_args__ = (
         Index('idx_estado_fecha', 'estado', 'fecha_programada'),

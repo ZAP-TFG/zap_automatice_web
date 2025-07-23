@@ -1,56 +1,210 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="/static/css/scan.css">
 
-<div class="container mt-5">
-    <h2 class="mb-4">Configure Scan</h2>
-    <form id="scanForm" method="post" enctype="multipart/form-data">
-        {{ form.hidden_tag() }}  <!-- CSRF token -->
-        
-        <!-- URL -->
-        <div class="mb-3">
-            {{ form.url.label(class="form-label") }}
-            {{ form.url(class="form-control", id="scanUrl") }}
-        </div>
-
-        <!-- Intensidad -->
-        <div class="mb-3">
-            {{ form.strength.label(class="form-label") }}
-            {{ form.strength(class="form-select", id="scanIntensity") }}
-        </div>
-
-         <!-- Email -->
-         <div class="mb-3">
-            {{ form.email.label(class="form-label") }}
-            {{ form.email(class="form-control", id="email") }}
-        </div>
-
-        <!-- Programar escaneo -->
-        <div class="form-check form-switch mb-3">
-                {{ form.schedule.label(class="form-check-label", for="scheduleSwitch") }}
-                {{ form.schedule(class="form-check-input", id="scheduleSwitch") }}
-        </div>
-
-        <!-- Calendario dinámico (oculto inicialmente) -->
-        <div id="scheduleFields" class="d-none">
-            <div class="mb-3">
-                {{ form.scanDateTime.label(class="form-label") }}
-                <div class="input-group">
-                    {{ form.scanDateTime(class="form-control", id="datetimepicker") }}
-                </div>
+<div class="scan-container">
+    <div class="scan-wrapper">
+        <!-- Header Profesional -->
+        <div class="scan-header">
+            <div class="header-content">
+                <h2 class="scan-title">
+                    <i class="fas fa-shield-alt"></i>
+                    Configuración de Escaneo
+                </h2>
+                <p class="scan-subtitle">Configure y programe sus escaneos de seguridad</p>
             </div>
         </div>
 
-        <div class="mb-3">
-            {{ form.submit(class="btn btn-primary") }}
+        <!-- Formulario Principal -->
+        <div class="scan-main">
+            <form id="scanForm" method="post" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+
+                <!-- Modo de escaneo -->
+                <div class="scan-section">
+                    <div class="section-header">
+                        <h4 class="section-title">
+                            <i class="fas fa-cogs"></i>
+                            Modo de Escaneo
+                        </h4>
+                    </div>
+                    <div class="scan-mode-selector">
+                        <div class="mode-option">
+                            <input type="radio" class="btn-check" name="scanMode" id="basicScan" value="basic" checked>
+                            <label class="btn btn-mode" for="basicScan">
+                                <div class="mode-icon">
+                                    <i class="fas fa-zap"></i>
+                                </div>
+                                <div class="mode-content">
+                                    <h5>Basic Scan</h5>
+                                    <p>Escaneo básico con URL y configuración simple</p>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <div class="mode-option">
+                            <input type="radio" class="btn-check" name="scanMode" id="planScan" value="plan">
+                            <label class="btn btn-mode" for="planScan">
+                                <div class="mode-icon">
+                                    <i class="fas fa-file-code"></i>
+                                </div>
+                                <div class="mode-content">
+                                    <h5>Plan Scan (YAML)</h5>
+                                    <p>Escaneo avanzado con archivo de configuración</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos para Basic Scan -->
+                <div id="basicScanFields" class="scan-section">
+                    <div class="section-header">
+                        <h4 class="section-title">
+                            <i class="fas fa-globe"></i>
+                            Configuración Básica
+                        </h4>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-link"></i>
+                                {{ form.url.label.text }}
+                            </label>
+                            {{ form.url(class="form-control", id="scanUrl", placeholder="https://ejemplo.com") }}
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-tachometer-alt"></i>
+                                {{ form.strength.label.text }}
+                            </label>
+                            {{ form.strength(class="form-select", id="scanIntensity") }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos para Plan Scan -->
+                <div id="planScanFields" class="scan-section d-none">
+                    <div class="section-header">
+                        <h4 class="section-title">
+                            <i class="fas fa-upload"></i>
+                            Configuración Avanzada
+                        </h4>
+                    </div>
+                    
+                    <!-- Campo URL para Plan Scan -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-link"></i>
+                            URL del Objetivo
+                        </label>
+                        <input type="url" class="form-control" id="planUrl" name="url" placeholder="https://ejemplo.com">
+                    </div>
+                    
+                    <!-- Área de subida de archivo -->
+                    <div class="file-upload-area">
+                        <input type="file" class="form-control" id="yamlFile" name="yamlFile" accept=".yml,.yaml">
+                        <div class="upload-helper">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Sube un archivo YAML con el plan de automatización de ZAP</p>
+                        </div>
+                    </div>
+
+                    <div id="planInfo" class="plan-info d-none">
+                        <div class="info-header">
+                            <h6><i class="fas fa-info-circle"></i> Información del Plan</h6>
+                        </div>
+                        <div id="planDetails" class="info-content"></div>
+                    </div>
+                </div>
+
+                <!-- Email -->
+                <div class="scan-section">
+                    <div class="section-header">
+                        <h4 class="section-title">
+                            <i class="fas fa-envelope"></i>
+                            Notificaciones
+                        </h4>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-at"></i>
+                            {{ form.email.label.text }}
+                        </label>
+                        {{ form.email(class="form-control", id="email", placeholder="usuario@ejemplo.com") }}
+                    </div>
+                </div>
+
+                <!-- Programar escaneo -->
+                <div class="scan-section">
+                    <div class="section-header">
+                        <h4 class="section-title">
+                            <i class="fas fa-clock"></i>
+                            Programación
+                        </h4>
+                    </div>
+                    
+                    <div class="schedule-toggle">
+                        <div class="form-switch-custom">
+                            {{ form.schedule(class="form-check-input", id="scheduleSwitch") }}
+                            <label class="form-check-label" for="scheduleSwitch">
+                                <i class="fas fa-calendar-plus"></i>
+                                {{ form.schedule.label.text }}
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="scheduleFields" class="schedule-fields d-none">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-calendar-alt"></i>
+                                {{ form.scanDateTime.label.text }}
+                            </label>
+                            <div class="input-group">
+                                {{ form.scanDateTime(class="form-control", id="datetimepicker") }}
+                                <span class="input-group-text">
+                                    <i class="fas fa-calendar-alt"></i>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón Submit -->
+                <div class="scan-actions">
+                    <button type="submit" class="btn btn-scan">
+                        <i class="fas fa-rocket"></i>
+                        <span>Iniciar Escaneo</span>
+                    </button>
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
 </div>
 
-<!-- Scripts necesarios -->
+<!-- Toast para notificaciones -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="scanToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-shield-alt me-2"></i>
+            <strong class="me-auto">Escaneo</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastMessage">
+            <!-- Mensaje dinámico -->
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/scan.js"></script>
 
 {% endblock %}

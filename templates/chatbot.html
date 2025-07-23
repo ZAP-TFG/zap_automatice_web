@@ -2,29 +2,79 @@
 
 {% block content %}
 <link rel="stylesheet" href="/static/css/style_chatbot.css">
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-14">
-            <div class="card shadow-lg">
-                <div class="card-header bg-primary text-white text-center">
-                    <h4>Chatbot</h4>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<div class="chatbot-container">
+    <div class="chat-wrapper">
+        <!-- Header del Chat -->
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <div class="avatar-container">
+                    <div class="bot-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="status-indicator online"></div>
                 </div>
-                <div class="card-body" id="chat-container">
-                    <div id="messages" class="overflow-auto" style="max-height: 400px;"></div>
+                <div class="chat-title">
+                    <h3>Asistente Virtual</h3>
+                    <span class="chat-status">En línea</span>
                 </div>
-                <div class="card-footer bg-light">
-                    <div class="input-group">
-                        {{ form.message(class="form-control", id="user-input")}}
-                        {{ form.submit(class="btn btn-primary", id="send-button")}}
+            </div>
+            <div class="chat-actions">
+                <button class="btn-action" id="clear-chat" title="Limpiar chat">
+                    <i class="fas fa-trash"></i>
+                </button>
+                <button class="btn-action" id="minimize-chat" title="Minimizar">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Área de Mensajes -->
+        <div class="chat-body" id="chat-container">
+            <div id="messages" class="messages-container">
+                <!-- Los mensajes se agregan dinámicamente aquí -->
+            </div>
+            
+            <!-- Indicador de escritura -->
+            <div id="typing-indicator" class="typing-indicator" style="display: none;">
+                <div class="message-avatar">
+                    <div class="bot-avatar-small">
+                        <i class="fas fa-robot"></i>
                     </div>
                 </div>
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Área de Input -->
+        <div class="chat-footer">
+            <div class="input-container">
+                <button class="btn-attachment" title="Adjuntar archivo">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                {{ form.message(class="message-input", id="user-input", placeholder="Escribe tu mensaje...", autocomplete="off") }}
+                <button class="btn-emoji" title="Emojis">
+                    <i class="fas fa-smile"></i>
+                </button>
+                {{ form.submit(class="btn-send", id="send-button", style="display: none;") }}
+                <button class="btn-send-main" id="send-button-main" title="Enviar mensaje">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="chat-footer-info">
+                <span class="character-count">0/500</span>
             </div>
         </div>
     </div>
 </div>
-<!-- Bootstrap Bundle JS -->
+
+<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Chat Script -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/showdown/dist/showdown.min.js"></script>
 <script src="/static/js/chatbot.js"></script>

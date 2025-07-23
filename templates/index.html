@@ -1,247 +1,405 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container my-4">
-    <!-- Dashboard Cards -->
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <h5 class="card-title">Scans Completed</h5>
-                    <p class="card-text">{{ data.scans_completed }}</p>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="/static/css/dashboard.css">
+
+<div class="dashboard-container">
+    <!-- Header Profesional -->
+    <div class="dashboard-header">
+        <div class="header-content">
+            <h2 class="dashboard-title">
+                <i class="fas fa-chart-line"></i>
+                Panel de Control
+            </h2>
+            <p class="dashboard-subtitle">Monitoreo y análisis de seguridad en tiempo real</p>
+        </div>
+    </div>
+
+    <!-- Métricas Principales -->
+    <div class="metrics-section">
+        <div class="metrics-grid">
+            <div class="metric-card scans-card">
+                <div class="metric-content">
+                    <div class="metric-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="metric-info">
+                        <h3 class="metric-value">{{ data.scans_completed | default(0) }}</h3>
+                        <p class="metric-label">Escaneos Completados</p>
+                    </div>
+                </div>
+                <div class="metric-trend">
+                    <i class="fas fa-arrow-up trend-up"></i>
+                    <span>+5% vs mes anterior</span>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card bg-warning text-white">
-                <div class="card-body">
-                    <h5 class="card-title">Total Alerts</h5>
-                    <p class="card-text">{{ data.total_vulnerabilities }}</p>
+
+            <div class="metric-card alerts-card">
+                <div class="metric-content">
+                    <div class="metric-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="metric-info">
+                        <h3 class="metric-value">{{ data.total_vulnerabilities | default(0) }}</h3>
+                        <p class="metric-label">Total de Alertas</p>
+                    </div>
+                </div>
+                <div class="metric-trend">
+                    <i class="fas fa-arrow-down trend-down"></i>
+                    <span>-12% vs mes anterior</span>
+                </div>
+            </div>
+
+            <div class="metric-card progress-card">
+                <div class="metric-content">
+                    <div class="metric-icon">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                    <div class="metric-info">
+                        <h3 class="metric-value" id="activeScans">-</h3>
+                        <p class="metric-label">Escaneos Activos</p>
+                    </div>
+                </div>
+                <div class="metric-trend">
+                    <i class="fas fa-clock"></i>
+                    <span>En progreso</span>
+                </div>
+            </div>
+
+            <div class="metric-card scheduled-card">
+                <div class="metric-content">
+                    <div class="metric-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="metric-info">
+                        <h3 class="metric-value" id="scheduledScans">-</h3>
+                        <p class="metric-label">Programados</p>
+                    </div>
+                </div>
+                <div class="metric-trend">
+                    <i class="fas fa-calendar-check"></i>
+                    <span>Próximos 7 días</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Charts -->
-    <div class="row my-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Vulnerability Trends</h5>
+    <!-- Sección de Alertas -->
+    <div class="alerts-section">
+        <div class="alerts-grid">
+            <!-- Alertas del Último Escáner (2 columnas) -->
+            <div class="alert-card last-scan-alerts">
+                <div class="alert-header">
+                    <h4 class="alert-title">
+                        <i class="fas fa-bell"></i>
+                        Alertas del Último Escáner
+                    </h4>
+                    <div class="alert-actions">
+                        <button class="alert-btn refresh-btn" id="refreshLastScan">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button class="alert-btn export-btn" id="exportLastScan">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-summary">
+                        <div class="summary-item high-alerts">
+                            <div class="summary-icon">
+                                <i class="fas fa-exclamation-circle"></i>
+                            </div>
+                            <div class="summary-info">
+                                <h5 id="lastScanHighCount">-</h5>
+                                <p>Altas</p>
+                            </div>
+                        </div>
+                        <div class="summary-item medium-alerts">
+                            <div class="summary-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="summary-info">
+                                <h5 id="lastScanMediumCount">-</h5>
+                                <p>Medias</p>
+                            </div>
+                        </div>
+                        <div class="summary-item low-alerts">
+                            <div class="summary-icon">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div class="summary-info">
+                                <h5 id="lastScanLowCount">-</h5>
+                                <p>Bajas</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert-list" id="lastScanAlertsList">
+                        <div class="loading-state">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Cargando alertas...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Consulta de Alertas por URL (3 columnas) -->
+            <div class="alert-card url-search-alerts">
+                <div class="alert-header">
+                    <h4 class="alert-title">
+                        <i class="fas fa-search"></i>
+                        Consultar Alertas por URL
+                    </h4>
+                    <div class="alert-status" id="searchStatus">
+                        <span class="status-indicator inactive"></span>
+                        <span>Sin consulta</span>
+                    </div>
+                </div>
+                <div class="alert-content">
+                    <div class="search-section">
+                        <div class="search-input-group">
+                            <input type="text" 
+                                   id="urlSearchInput" 
+                                   class="search-input" 
+                                   placeholder="Ingrese URL o dominio para buscar...">
+                            <button class="search-btn" id="searchAlertsBtn">
+                                <i class="fas fa-search"></i>
+                                Buscar
+                            </button>
+                        </div>
+                        <div class="search-filters">
+                            <select id="severityFilter" class="filter-select">
+                                <option value="">Todas las severidades</option>
+                                <option value="high">Altas</option>
+                                <option value="medium">Medias</option>
+                                <option value="low">Bajas</option>
+                                <option value="info">Informativas</option>
+                            </select>
+                            <select id="dateFilter" class="filter-select">
+                                <option value="7">Últimos 7 días</option>
+                                <option value="30">Últimos 30 días</option>
+                                <option value="90">Últimos 90 días</option>
+                                <option value="">Todos los períodos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="search-results" id="searchResults">
+                        <div class="no-search-state">
+                            <i class="fas fa-search"></i>
+                            <p>Ingrese una URL para comenzar la búsqueda</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos y Análisis -->
+    <div class="charts-section">
+        <div class="charts-grid">
+            <!-- Tendencias de Vulnerabilidades -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h4 class="chart-title">
+                        <i class="fas fa-chart-area"></i>
+                        Tendencias de Vulnerabilidades
+                    </h4>
+                    <div class="chart-actions">
+                        <button class="chart-btn active" data-period="6m">6M</button>
+                        <button class="chart-btn" data-period="1y">1A</button>
+                    </div>
+                </div>
+                <div class="chart-content">
                     <canvas id="areaChart"></canvas>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Issues by Severity</h5>
+
+            <!-- Severidad de Issues -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h4 class="chart-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Issues por Severidad
+                    </h4>
+                    <div class="chart-legend" id="severityLegend"></div>
+                </div>
+                <div class="chart-content">
                     <canvas id="barChart"></canvas>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="row my-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">OWASP TOP 10</h5>
+
+            <!-- OWASP TOP 10 -->
+            <div class="chart-card owasp-card">
+                <div class="chart-header">
+                    <h4 class="chart-title">
+                        <i class="fas fa-shield-alt"></i>
+                        OWASP TOP 10
+                    </h4>
+                    <div class="chart-info">
+                        <i class="fas fa-info-circle" data-bs-toggle="tooltip" 
+                           title="Análisis basado en las 10 vulnerabilidades más críticas según OWASP"></i>
+                    </div>
+                </div>
+                <div class="chart-content radar-content">
                     <canvas id="radarChart"></canvas>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card" style="background-color: #1e1e1e;">
-                <div class="card-body text-white text-center">
-                    <h2 class="card-title text-white text-center">PROGRESO DEL ESCANER</h2>
-                    <br>
-                    <div id="ultimoScanner">...</div>
-                <br>
-                    <div class="d-flex justify-content-center">
-                        <div style="width: 250px; height: 250px;">
+
+            <!-- Progreso del Scanner -->
+            <div class="chart-card scanner-card">
+                <div class="chart-header">
+                    <h4 class="chart-title">
+                        <i class="fas fa-cogs"></i>
+                        Estado del Scanner
+                    </h4>
+                    <div class="scanner-status" id="scannerStatus">
+                        <span class="status-indicator active"></span>
+                        <span>Activo</span>
+                    </div>
+                </div>
+                <div class="chart-content scanner-content">
+                    <!-- Progreso Actual -->
+                    <div class="progress-section">
+                        <div class="progress-info">
+                            <h5>Último Escaneo</h5>
+                            <p id="ultimoScanner">Cargando...</p>
+                        </div>
+                        <div class="progress-chart">
                             <canvas id="scanProgressChart"></canvas>
                         </div>
                     </div>
-                    <br>
-                    <div class="text-center text-white mt-3">
-                        <div><h4>Próximo Escaner</h4></div>
-                        <div id="proximoScanner">...</div>
-                        <div id="proximoScannerFecha">...</div>
-                    </div>
-                    <br>
-                    <br>
-                    <br>
-                    <br>
+
+                    <!-- Próximo Escaneo -->
+                    <div class="next-scan-section">
+                        <div class="next-scan-header">
+                            <h5>
+                                <i class="fas fa-clock"></i>
+                                Próximo Escaneo
+                            </h5>
+                        </div>
+                        <div class="next-scan-info">
+                            <div class="next-scan-name" id="proximoScanner">-</div>
+                            <div class="next-scan-date" id="proximoScannerFecha">-</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    
-</div>
 
+    <!-- Modal para mostrar detalles de alertas -->
+    <div class="modal fade" id="alertDetailsModal" tabindex="-1" aria-labelledby="alertDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="alertDetailsModalLabel">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Detalles de la Alerta
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="alertDetailsContent">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2">Cargando detalles...</p>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="copyAlertDetails">
+                        <i class="fas fa-copy"></i> Copiar Detalles
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para mostrar alertas por URL -->
+    <div class="modal fade" id="urlAlertsModal" tabindex="-1" aria-labelledby="urlAlertsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="urlAlertsModalLabel">
+                        <i class="fas fa-search"></i>
+                        Alertas por URL
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="urlAlertsContent">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2">Cargando alertas...</p>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-success" id="exportUrlAlerts">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para mostrar detalles por severidad -->
+    <div class="modal fade" id="severityDetailsModal" tabindex="-1" aria-labelledby="severityDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="severityDetailsModalLabel">
+                        <i class="fas fa-list"></i>
+                        Detalles de Alertas
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="severityDetailsContent">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2">Cargando detalles...</p>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-success" id="exportSeverityDetails">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast para notificaciones -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="dashboardToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-chart-line me-2"></i>
+                <strong class="me-auto">Dashboard</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                <!-- Mensaje dinámico -->
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.4/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Area Chart
-const areaCtx = document.getElementById('areaChart').getContext('2d');
-new Chart(areaCtx, {
-    type: 'line',
-    data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
-            label: 'Vulnerabilities Found',
-            data: [100, 200, 150, 300, 250, 400],
-            borderColor: 'rgba(0, 123, 255, 1)',
-            backgroundColor: 'rgba(0, 123, 255, 0.2)',
-        }]
-    },
-    options: {
-        responsive: true,
-    }
-});
-
-// Bar Chart
-const barCtx = document.getElementById('barChart').getContext('2d');
-new Chart(barCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ data.chart_data.labels | tojson }},
-        datasets: [{
-            label: 'Issues by Severity',
-            data: {{ data.chart_data.data | tojson }},
-            backgroundColor: ['#007bff', '#ffc107', '#fd7e14', '#dc3545']
-        }]
-    },
-    options: {
-        responsive: true,
-    }
-});
-
-const ctx = document.getElementById('radarChart').getContext('2d');
-
-const radarChart = new Chart(ctx, {
-  type: 'radar',
-  data: {
-    labels: {{ data.owasp_top_10.labels | tojson }},
-    datasets: [{
-      label: 'OWASP TOP 10',
-      data: {{data.owasp_top_10.data | tojson}},
-      fill: true,
-      backgroundColor: 'rgba(54, 162, 235, 0.3)', 
-      borderColor: 'rgba(54, 162, 235, 1)',
-      borderWidth: 2, 
-      pointBackgroundColor: 'rgba(54, 162, 235, 1)',
-      pointBorderColor: '#fff',
-      pointHoverBackgroundColor: '#fff',
-      pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
-    }]
-  },
-  options: {
-    responsive: true,
-    scales: {
-      r: {
-        angleLines: { color: "rgba(255, 255, 255, 0.3)" }, /* Líneas más visibles */
-        grid: { color: "rgba(255, 255, 255, 0.2)" }, /* Mejor visibilidad */
-        pointLabels: { color: "white", font: { size: 14 } }, /* Letras blancas */
-        ticks: { color: "white", backdropColor: "transparent", font: { size: 12 } } /* Numeración blanca */
-      }
-    },
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: { color: "white" } /* Leyenda blanca */
-      },
-      title: {
-        display: true,
-        text: 'Radar Chart - A01 a A10',
-        color: "white"
-      }
-    }
-  }
-});
-
-// Configuración del gráfico donut para el progreso
-const progressCtx = document.getElementById('scanProgressChart').getContext('2d');
-const progressChart = new Chart(progressCtx, {
-    type: 'doughnut',
-    data: {
-        datasets: [{
-            data: [0, 100],  // [progreso, restante]
-            backgroundColor: ["#3aef37", "#333333"],  // [color progreso, color fondo]
-            borderWidth: 0
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        radius: '100%',
-        cutout: '85%',  // Tamaño del hueco en el centro
-        plugins: {
-            legend: {
-                display: false  // Ocultar leyenda
-            },
-            tooltip: {
-                enabled: false  // Desactivar tooltips
-            }
-        }
-    },
-    plugins: [{
-        id: 'centerText',
-        beforeDraw: function(chart) {
-            const width = chart.width;
-            const height = chart.height;
-            const ctx = chart.ctx;
-            
-            ctx.restore();
-            
-            // Texto del porcentaje en el centro
-            const fontSize = (height / 114).toFixed(2);
-            ctx.font = fontSize + "em sans-serif";
-            ctx.textBaseline = "middle";
-            ctx.textAlign = "center";
-            ctx.fillStyle = "#9b9b9b"; //textto
-            
-            const text = chart.data.datasets[0].data[0] + "%";
-            ctx.fillText(text, width / 2, height / 2);
-            
-            ctx.save();
-        }
-    }]
-});
-
-// Función para actualizar el gráfico de progreso
-function actualizarProgreso() {
-    $.ajax({
-        url: '/scan_progress',
-        type: 'GET',
-        dataType: 'json',
-        success: function(data) {
-            // Actualizar datos del gráfico
-            progressChart.data.datasets[0].data = [data.progress, 100 - data.progress];
-            progressChart.update();
-            
-            document.getElementById('ultimoScanner').innerText = data.ultimoScanner;
-                document.getElementById('proximoScanner').innerText = data.proximo;
-            document.getElementById('proximoScannerFecha').innerText = data.fecha;
-           
-            // Si no ha terminado, seguir consultando
-            if (data.progress < 100) {
-                setTimeout(actualizarProgreso, 2000);  // Consultar cada 2 segundos
-            }
+    // Pasar datos del backend al JavaScript (CON CORRECCIÓN DE ERRORES)
+    window.dashboardData = {
+        chartData: {
+            labels: {{ (data.chart_data.labels if data.chart_data else []) | default([]) | tojson }},
+            data: {{ (data.chart_data.data if data.chart_data else []) | default([]) | tojson }}
         },
-        error: function(error) {
-            console.error("Error al obtener el progreso:", error);
-            setTimeout(actualizarProgreso, 5000);  // Reintentar en 5 segundos
-        }
-    });
-}
-
-// Iniciar la actualización al cargar la página
-$(document).ready(function() {
-    actualizarProgreso();
-});
+        owaspData: {
+            labels: {{ (data.owasp_top_10.labels if data.owasp_top_10 else []) | default([]) | tojson }},
+            data: {{ (data.owasp_top_10.data if data.owasp_top_10 else []) | default([]) | tojson }}
+        },
+        lastScanAlerts: {{ data.last_scan_alerts | default([]) | tojson }}
+    };
 </script>
+<script src="/static/js/dashboard.js"></script>
+
 {% endblock %}
