@@ -31,7 +31,7 @@
                 </div>
                 <div class="metric-trend">
                     <i class="fas fa-arrow-up trend-up"></i>
-                    <span>+5% vs mes anterior</span>
+                    <span></span>
                 </div>
             </div>
 
@@ -47,7 +47,7 @@
                 </div>
                 <div class="metric-trend">
                     <i class="fas fa-arrow-down trend-down"></i>
-                    <span>-12% vs mes anterior</span>
+                    <span></span>
                 </div>
             </div>
 
@@ -85,116 +85,7 @@
         </div>
     </div>
 
-    <!-- Sección de Alertas -->
-    <div class="alerts-section">
-        <div class="alerts-grid">
-            <!-- Alertas del Último Escáner (2 columnas) -->
-            <div class="alert-card last-scan-alerts">
-                <div class="alert-header">
-                    <h4 class="alert-title">
-                        <i class="fas fa-bell"></i>
-                        Alertas del Último Escáner
-                    </h4>
-                    <div class="alert-actions">
-                        <button class="alert-btn refresh-btn" id="refreshLastScan">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                        <button class="alert-btn export-btn" id="exportLastScan">
-                            <i class="fas fa-download"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="alert-content">
-                    <div class="alert-summary">
-                        <div class="summary-item high-alerts">
-                            <div class="summary-icon">
-                                <i class="fas fa-exclamation-circle"></i>
-                            </div>
-                            <div class="summary-info">
-                                <h5 id="lastScanHighCount">-</h5>
-                                <p>Altas</p>
-                            </div>
-                        </div>
-                        <div class="summary-item medium-alerts">
-                            <div class="summary-icon">
-                                <i class="fas fa-exclamation-triangle"></i>
-                            </div>
-                            <div class="summary-info">
-                                <h5 id="lastScanMediumCount">-</h5>
-                                <p>Medias</p>
-                            </div>
-                        </div>
-                        <div class="summary-item low-alerts">
-                            <div class="summary-icon">
-                                <i class="fas fa-info-circle"></i>
-                            </div>
-                            <div class="summary-info">
-                                <h5 id="lastScanLowCount">-</h5>
-                                <p>Bajas</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="alert-list" id="lastScanAlertsList">
-                        <div class="loading-state">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p>Cargando alertas...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Consulta de Alertas por URL (3 columnas) -->
-            <div class="alert-card url-search-alerts">
-                <div class="alert-header">
-                    <h4 class="alert-title">
-                        <i class="fas fa-search"></i>
-                        Consultar Alertas por URL
-                    </h4>
-                    <div class="alert-status" id="searchStatus">
-                        <span class="status-indicator inactive"></span>
-                        <span>Sin consulta</span>
-                    </div>
-                </div>
-                <div class="alert-content">
-                    <div class="search-section">
-                        <div class="search-input-group">
-                            <input type="text" 
-                                   id="urlSearchInput" 
-                                   class="search-input" 
-                                   placeholder="Ingrese URL o dominio para buscar...">
-                            <button class="search-btn" id="searchAlertsBtn">
-                                <i class="fas fa-search"></i>
-                                Buscar
-                            </button>
-                        </div>
-                        <div class="search-filters">
-                            <select id="severityFilter" class="filter-select">
-                                <option value="">Todas las severidades</option>
-                                <option value="high">Altas</option>
-                                <option value="medium">Medias</option>
-                                <option value="low">Bajas</option>
-                                <option value="info">Informativas</option>
-                            </select>
-                            <select id="dateFilter" class="filter-select">
-                                <option value="7">Últimos 7 días</option>
-                                <option value="30">Últimos 30 días</option>
-                                <option value="90">Últimos 90 días</option>
-                                <option value="">Todos los períodos</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="search-results" id="searchResults">
-                        <div class="no-search-state">
-                            <i class="fas fa-search"></i>
-                            <p>Ingrese una URL para comenzar la búsqueda</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Gráficos y Análisis -->
+     <!-- Gráficos y Análisis -->
     <div class="charts-section">
         <div class="charts-grid">
             <!-- Tendencias de Vulnerabilidades -->
@@ -258,7 +149,7 @@
                     </div>
                 </div>
                 <div class="chart-content scanner-content">
-                    <!-- Progreso Actual -->
+                     
                     <div class="progress-section">
                         <div class="progress-info">
                             <h5>Último Escaneo</h5>
@@ -269,7 +160,7 @@
                         </div>
                     </div>
 
-                    <!-- Próximo Escaneo -->
+                     
                     <div class="next-scan-section">
                         <div class="next-scan-header">
                             <h5>
@@ -283,10 +174,121 @@
                         </div>
                     </div>
                 </div>
+            </div> 
+        </div>
+    </div>
+
+
+    <!-- Sección de Alertas -->
+    <div class="alerts-section">
+        <div class="alerts-grid">
+            <!-- Alertas del Último Escáner (ancho completo) -->
+            <div class="alert-card last-scan-alerts">
+                <div class="alert-header">
+                    <h4 class="alert-title" id="lastScanAlertsTitle">
+                        <i class="fas fa-bell"></i>
+                        Alertas del Último Escáner
+                    </h4>
+                    <div class="alert-actions">
+                        <button class="alert-btn refresh-btn" id="refreshLastScan">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button class="alert-btn export-btn" id="exportLastScan">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-summary">
+                        <div class="summary-item high-alerts">
+                            <div class="summary-icon">
+                                <i class="fas fa-exclamation-circle"></i>
+                            </div>
+                            <div class="summary-info">
+                                <h5 id="lastScanHighCount">-</h5>
+                                <p>Altas</p>
+                            </div>
+                        </div>
+                        <div class="summary-item medium-alerts">
+                            <div class="summary-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="summary-info">
+                                <h5 id="lastScanMediumCount">-</h5>
+                                <p>Medias</p>
+                            </div>
+                        </div>
+                        <div class="summary-item low-alerts">
+                            <div class="summary-icon">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div class="summary-info">
+                                <h5 id="lastScanLowCount">-</h5>
+                                <p>Bajas</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert-list" id="lastScanAlertsList">
+                        <div class="loading-state">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Cargando alertas...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Consulta de Alertas por URL (ancho completo) -->
+            <div class="alert-card url-search-alerts">
+                <div class="alert-header">
+                    <h4 class="alert-title">
+                        <i class="fas fa-search"></i>
+                        Consultar Alertas por URL
+                    </h4>
+                    <div class="alert-status" id="searchStatus">
+                        <span class="status-indicator inactive"></span>
+                        <span>Sin consulta</span>
+                    </div>
+                </div>
+                <div class="alert-content">
+                    <div class="search-section">
+                        <div class="search-input-group">
+                            <input type="text" 
+                                   id="urlSearchInput" 
+                                   class="search-input" 
+                                   placeholder="Ingrese URL o dominio para buscar...">
+                            <button class="search-btn" id="searchAlertsBtn">
+                                <i class="fas fa-search"></i>
+                                Buscar
+                            </button>
+                        </div>
+                        <div class="search-filters">
+                            <select id="severityFilter" class="filter-select">
+                                <option value="">Todas las severidades</option>
+                                <option value="high">Altas</option>
+                                <option value="medium">Medias</option>
+                                <option value="low">Bajas</option>
+                                <option value="info">Informativas</option>
+                            </select>
+                            <select id="dateFilter" class="filter-select">
+                                <option value="7">Últimos 7 días</option>
+                                <option value="30">Últimos 30 días</option>
+                                <option value="90">Últimos 90 días</option>
+                                <option value="">Todos los períodos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="search-results" id="searchResults">
+                        <div class="no-search-state">
+                            <i class="fas fa-search"></i>
+                            <p>Ingrese una URL para comenzar la búsqueda</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+   
     <!-- Modal para mostrar detalles de alertas -->
     <div class="modal fade" id="alertDetailsModal" tabindex="-1" aria-labelledby="alertDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">

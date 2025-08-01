@@ -35,6 +35,7 @@ function initializeAlerts() {
 // Cargar alertas del último escáner
 function loadLastScanAlerts() {
     const alertsList = $('#lastScanAlertsList');
+    const titleElement = $('#lastScanAlertsTitle');
     
     // Mostrar loading
     alertsList.html('<div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>Cargando alertas...</p></div>');
@@ -47,9 +48,29 @@ function loadLastScanAlerts() {
         success: function(data) {
             updateLastScanSummary(data.summary || {});
             displayLastScanAlerts(data.alerts || []);
+            
+            // NUEVO: Actualizar título con la URL
+            if (data.scan_info && data.scan_info.target_url) {
+                titleElement.html(`
+                    <i class="fas fa-bell"></i>
+                    Alertas del Último Escáner <span class="url-subtitle">(${data.scan_info.target_url})</span>
+                `);
+            } else {
+                // Mantener título por defecto si no hay URL
+                titleElement.html(`
+                    <i class="fas fa-bell"></i>
+                    Alertas del Último Escáner
+                `);
+            }
         },
         error: function(xhr, status, error) {
             console.error('Error al cargar alertas del último escáner:', error);
+            
+            // Restablecer título por defecto en caso de error
+            titleElement.html(`
+                <i class="fas fa-bell"></i>
+                Alertas del Último Escáner
+            `);
             
             // Mostrar datos de ejemplo si el endpoint no existe
             if (xhr.status === 404) {
@@ -254,7 +275,7 @@ function searchAlerts() {
     });
 }
 
-// Mostrar resultados de búsqueda
+// CAMBIO PRINCIPAL: Mostrar resultados de búsqueda (MODIFICADO PARA MOSTRAR CADA ESCANEO POR SEPARADO)
 function displaySearchResults(results, searchUrl) {
     const searchResults = $('#searchResults');
     
@@ -269,16 +290,29 @@ function displaySearchResults(results, searchUrl) {
     }
     
     let html = '';
+    
+    // CAMBIO: Mostrar cada escaneo por separado con su fecha
     results.forEach(result => {
         const alertBadges = createAlertBadges(result.alerts_by_severity);
+        const scanDate = result.scan_date_formatted || formatDateTime(result.scan_date) || 'Fecha no disponible';
+        
         html += `
             <div class="search-result-item" data-url="${result.url}" data-scan-id="${result.scan_id}">
                 <div class="result-header">
-                    <div class="result-url">${result.url}</div>
-                    <div class="result-count">${result.total_alerts} alertas</div>
+                    <div class="result-url">
+                        <i class="fas fa-link"></i>
+                        <span style="color: #ffffff;">${result.url}</span>
+                    </div>
+                    <div class="result-date">
+                        <i class="fas fa-calendar"></i>
+                        <span>${scanDate}</span>
+                    </div>
                 </div>
-                <div class="result-alerts">
-                    ${alertBadges}
+                <div class="result-summary">
+                    <div class="result-count">${result.total_alerts} alertas</div>
+                    <div class="result-alerts">
+                        ${alertBadges}
+                    </div>
                 </div>
             </div>
         `;
@@ -286,7 +320,7 @@ function displaySearchResults(results, searchUrl) {
     
     searchResults.html(html);
     
-    // Event listener para ver detalles del resultado
+    // CAMBIO: Event listener actualizado para pasar scan_id específico
     $('.search-result-item').on('click', function() {
         const url = $(this).data('url');
         const scanId = $(this).data('scan-id');
@@ -294,21 +328,21 @@ function displaySearchResults(results, searchUrl) {
     });
 }
 
-// Crear badges de alertas (CORREGIDO)
+// Crear badges de alertas (MEJORADO CON EVENT LISTENERS)
 function createAlertBadges(alertsBySeverity) {
     let badges = '';
     
     if (alertsBySeverity.high > 0) {
-        badges += `<span class="result-alert-badge high">${alertsBySeverity.high} Altas</span>`;
+        badges += `<span class="result-alert-badge high" data-severity="high">${alertsBySeverity.high} Altas</span>`;
     }
     if (alertsBySeverity.medium > 0) {
-        badges += `<span class="result-alert-badge medium">${alertsBySeverity.medium} Medias</span>`;
+        badges += `<span class="result-alert-badge medium" data-severity="medium">${alertsBySeverity.medium} Medias</span>`;
     }
     if (alertsBySeverity.low > 0) {
-        badges += `<span class="result-alert-badge low">${alertsBySeverity.low} Bajas</span>`;
+        badges += `<span class="result-alert-badge low" data-severity="low">${alertsBySeverity.low} Bajas</span>`;
     }
     if (alertsBySeverity.info > 0) {
-        badges += `<span class="result-alert-badge info">${alertsBySeverity.info} Informativas</span>`;
+        badges += `<span class="result-alert-badge info" data-severity="informational">${alertsBySeverity.info} Informativas</span>`;
     }
     
     return badges;
@@ -327,7 +361,7 @@ function updateSearchStatus(status, resultCount = 0) {
             break;
         case 'completed':
             indicator.removeClass('searching inactive');
-            text.text(`${resultCount} resultados`);
+            text.text(`${resultCount} resultado(s) encontrado(s)`);
             break;
         case 'error':
             indicator.removeClass('searching').addClass('inactive');
@@ -362,29 +396,128 @@ function showAlertDetails(alertId) {
     });
 }
 
-// Mostrar detalles de alertas por URL específica (CORREGIDO)
+// CAMBIO: Mostrar detalles de alertas por URL específica (MODIFICADO PARA USAR SCAN_ID)
 function showUrlAlertDetails(url, scanId) {
-    // Obtener datos detallados para la URL
-    $.ajax({
-        url: '/search_alerts',
-        type: 'POST',
-        data: JSON.stringify({ url: url }),
-        contentType: 'application/json',
-        dataType: 'json',
-        success: function(data) {
-            if (data.results && data.results.length > 0) {
-                displayUrlAlerts(data.results[0], url, scanId);
-            } else {
-                showToast(`No se encontraron alertas para ${url}`, 'warning');
+    // Abrir modal inmediatamente
+    $('#urlAlertsModal').modal('show');
+    $('#urlAlertsModalLabel').html(`<i class="fas fa-search"></i> Alertas para: ${url}`);
+    
+    // Mostrar loading
+    $('#urlAlertsContent').html(`
+        <div class="text-center">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Cargando alertas del escaneo específico...</p>
+        </div>
+    `);
+    
+    // Obtener todas las severidades para el escaneo específico
+    loadAllSeveritiesForScan(url, scanId);
+}
+
+// NUEVA FUNCIÓN: Cargar todas las severidades para un escaneo específico
+function loadAllSeveritiesForScan(url, scanId) {
+    const severities = ['high', 'medium', 'low', 'informational'];
+    let allAlerts = [];
+    let completedRequests = 0;
+    let scanDate = '';
+    
+    severities.forEach(severity => {
+        $.ajax({
+            url: '/alert_details_by_severity',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                url: url,
+                severity: severity,
+                scan_id: scanId  // CLAVE: usar scan_id específico
+            }),
+            success: function(data) {
+                if (data.alerts && data.alerts.length > 0) {
+                    allAlerts = allAlerts.concat(data.alerts.map(alert => ({
+                        ...alert,
+                        severity: severity
+                    })));
+                }
+                
+                // Capturar fecha del escaneo
+                if (data.scan_date && !scanDate) {
+                    scanDate = data.scan_date;
+                }
+                
+                completedRequests++;
+                if (completedRequests === severities.length) {
+                    displayAllAlertsInModal(allAlerts, url, scanDate, scanId);
+                }
+            },
+            error: function(error) {
+                console.error(`Error al cargar alertas ${severity}:`, error);
+                completedRequests++;
+                if (completedRequests === severities.length) {
+                    displayAllAlertsInModal(allAlerts, url, scanDate, scanId);
+                }
             }
-        },
-        error: function() {
-            showToast('Error al cargar alertas por URL', 'error');
-        }
+        });
     });
 }
 
-// Función para mostrar detalles de una alerta en modal (CORREGIDO)
+// NUEVA FUNCIÓN: Mostrar todas las alertas en el modal
+function displayAllAlertsInModal(alerts, url, scanDate, scanId) {
+    if (alerts.length === 0) {
+        $('#urlAlertsContent').html(`
+            <div class="no-results-state">
+                <i class="fas fa-shield-alt"></i>
+                <p>No se encontraron alertas para este escaneo específico</p>
+            </div>
+        `);
+        return;
+    }
+    
+    // Agrupar por severidad
+    const groupedAlerts = {
+        high: alerts.filter(a => a.severity === 'high'),
+        medium: alerts.filter(a => a.severity === 'medium'),
+        low: alerts.filter(a => a.severity === 'low'),
+        informational: alerts.filter(a => a.severity === 'informational')
+    };
+    
+    let html = `
+        <div class="url-alerts-container">
+            <div class="url-header mb-3">
+                <h4>${url}</h4>
+                <p class="text-muted">Escaneo del: ${scanDate || 'Fecha no disponible'}</p>
+                <div class="alert-summary-badges">
+                    ${groupedAlerts.high.length > 0 ? `<span class="badge bg-danger">${groupedAlerts.high.length} Altas</span>` : ''}
+                    ${groupedAlerts.medium.length > 0 ? `<span class="badge bg-warning">${groupedAlerts.medium.length} Medias</span>` : ''}
+                    ${groupedAlerts.low.length > 0 ? `<span class="badge bg-info">${groupedAlerts.low.length} Bajas</span>` : ''}
+                    ${groupedAlerts.informational.length > 0 ? `<span class="badge bg-secondary">${groupedAlerts.informational.length} Informativas</span>` : ''}
+                </div>
+            </div>
+            
+            <div class="severity-sections">
+    `;
+    
+    Object.entries(groupedAlerts).forEach(([severity, severityAlerts]) => {
+        if (severityAlerts.length > 0) {
+            const severityName = {
+                high: 'Altas',
+                medium: 'Medias', 
+                low: 'Bajas',
+                informational: 'Informativas'
+            }[severity];
+            
+            html += createSeveritySection(severity, severityName, severityAlerts.length, scanId, url);
+        }
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    $('#urlAlertsContent').html(html);
+}
+
+// Función para mostrar detalles de una alerta en modal (MEJORADO)
 function displayAlertDetails(alert) {
     const severityClass = getSeverityClass(alert.severity);
     const severityIcon = getSeverityIcon(alert.severity);
@@ -474,36 +607,7 @@ function displayAlertDetails(alert) {
     });
 }
 
-// Función para mostrar alertas por URL en modal (CORREGIDO)
-function displayUrlAlerts(result, searchUrl, scanId) {
-    const content = `
-        <div class="url-alerts-container">
-            <div class="url-header mb-3">
-                <h4>${result.url}</h4>
-                <p class="text-muted">Último escaneo: ${formatDateTime(result.scan_date)}</p>
-                <div class="alert-summary-badges">
-                    ${result.alerts_by_severity.high > 0 ? `<span class="badge bg-danger">${result.alerts_by_severity.high} Altas</span>` : ''}
-                    ${result.alerts_by_severity.medium > 0 ? `<span class="badge bg-warning">${result.alerts_by_severity.medium} Medias</span>` : ''}
-                    ${result.alerts_by_severity.low > 0 ? `<span class="badge bg-info">${result.alerts_by_severity.low} Bajas</span>` : ''}
-                    ${result.alerts_by_severity.info > 0 ? `<span class="badge bg-secondary">${result.alerts_by_severity.info} Informativas</span>` : ''}
-                </div>
-            </div>
-            
-            <div class="severity-sections">
-                ${result.alerts_by_severity.high > 0 ? createSeveritySection('high', 'Altas', result.alerts_by_severity.high, result.scan_id || scanId, result.url) : ''}
-                ${result.alerts_by_severity.medium > 0 ? createSeveritySection('medium', 'Medias', result.alerts_by_severity.medium, result.scan_id || scanId, result.url) : ''}
-                ${result.alerts_by_severity.low > 0 ? createSeveritySection('low', 'Bajas', result.alerts_by_severity.low, result.scan_id || scanId, result.url) : ''}
-                ${result.alerts_by_severity.info > 0 ? createSeveritySection('informational', 'Informativas', result.alerts_by_severity.info, result.scan_id || scanId, result.url) : ''}
-            </div>
-        </div>
-    `;
-    
-    $('#urlAlertsContent').html(content);
-    $('#urlAlertsModalLabel').html(`<i class="fas fa-search"></i> Alertas para ${searchUrl}`);
-    $('#urlAlertsModal').modal('show');
-}
-
-// Funciones auxiliares (CORREGIDAS)
+// Funciones auxiliares
 function getSeverityClass(severity) {
     const classes = {
         'high': 'severity-high',
@@ -541,6 +645,7 @@ function escapeHtml(text) {
 }
 
 function formatDateTime(dateString) {
+    if (!dateString) return 'Fecha no disponible';
     const date = new Date(dateString);
     return date.toLocaleString('es-ES', {
         year: 'numeric',
@@ -581,7 +686,7 @@ function createSeveritySection(severity, label, count, scanId, url) {
     `;
 }
 
-// NUEVA FUNCIÓN: Cargar detalles por severidad (IMPLEMENTADA CORRECTAMENTE)
+// CAMBIO: Cargar detalles por severidad (MODIFICADO PARA USAR SCAN_ID)
 function loadSeverityDetails(scanId, severity, url) {
     // Mostrar modal de loading
     $('#severityDetailsContent').html(`
@@ -593,18 +698,19 @@ function loadSeverityDetails(scanId, severity, url) {
     $('#severityDetailsModalLabel').html(`<i class="fas fa-list"></i> Alertas ${getSeverityLabel(severity)} - ${url}`);
     $('#severityDetailsModal').modal('show');
     
-    // Llamar al endpoint para obtener detalles específicos
+    // CAMBIO: Llamar al endpoint incluyendo scan_id específico
     $.ajax({
         url: `/alert_details_by_severity`,
         type: 'POST',
         data: JSON.stringify({
             url: url,
-            severity: severity
+            severity: severity,
+            scan_id: scanId  // CLAVE: incluir scan_id específico
         }),
         contentType: 'application/json',
         dataType: 'json',
         success: function(data) {
-            displaySeverityDetails(data.alerts || [], severity, url);
+            displaySeverityDetails(data.alerts || [], severity, url, data.scan_date);
         },
         error: function(xhr, status, error) {
             console.error('Error al cargar detalles de severidad:', error);
@@ -618,13 +724,13 @@ function loadSeverityDetails(scanId, severity, url) {
     });
 }
 
-// NUEVA FUNCIÓN: Mostrar detalles por severidad
-function displaySeverityDetails(alerts, severity, url) {
+// MEJORADO: Mostrar detalles por severidad con información del escaneo
+function displaySeverityDetails(alerts, severity, url, scanDate) {
     if (!alerts || alerts.length === 0) {
         $('#severityDetailsContent').html(`
             <div class="text-center text-muted">
                 <i class="fas fa-info-circle fa-2x"></i>
-                <p class="mt-2">No hay alertas de nivel ${getSeverityLabel(severity)} para esta URL</p>
+                <p class="mt-2">No hay alertas de nivel ${getSeverityLabel(severity)} para este escaneo</p>
             </div>
         `);
         return;
@@ -635,6 +741,7 @@ function displaySeverityDetails(alerts, severity, url) {
             <div class="mb-3">
                 <h5>Alertas ${getSeverityLabel(severity)} encontradas: ${alerts.length}</h5>
                 <p class="text-muted">URL: ${url}</p>
+                ${scanDate ? `<p class="text-muted">Fecha del escaneo: ${scanDate}</p>` : ''}
             </div>
             <div class="alerts-details-list">
     `;
@@ -837,16 +944,16 @@ function initBarChart() {
                 label: 'Issues por Severidad',
                 data: chartData.data,
                 backgroundColor: [
-                    'rgba(173, 216, 230, 0.8)',
-                    'rgba(255, 255, 153, 0.8)',
-                    'rgba(255, 140, 0, 0.8)',
-                    'rgba(255, 0, 0, 0.8)'
+                    'rgba(13, 202, 240, 0.8)',  // Info - Azul
+                    'rgba(255, 193, 7, 0.8)',   // Low - Amarillo
+                    'rgba(253, 126, 20, 0.8)',  // Medium - Naranja
+                    'rgba(220, 53, 69, 0.8)'    // High - Rojo
                 ],
                 borderColor: [
-                    '#ADD8E6',
-                    '#FFFF99',
-                    '#FF8C00',
-                    '#FF0000'
+                    '#0dcaf0',  // Info - Azul
+                    '#ffc107',  // Low - Amarillo
+                    '#fd7e14',  // Medium - Naranja
+                    '#dc3545'   // High - Rojo
                 ],
                 borderWidth: 2,
                 borderRadius: 8,
@@ -897,7 +1004,7 @@ function createSeverityLegend(labels) {
     const legendContainer = document.getElementById('severityLegend');
     if (!legendContainer) return;
     
-    const colors = ['#ADD8E6', '#FFFF99', '#FF8C00', '#FF0000'];
+    const colors = ['#0dcaf0', '#ffc107', '#fd7e14', '#dc3545'];
     
     legendContainer.innerHTML = '';
     
@@ -907,7 +1014,7 @@ function createSeverityLegend(labels) {
         
         const colorBox = document.createElement('div');
         colorBox.className = 'legend-color';
-        colorBox.style.backgroundColor = colors[index] || '#ADD8E6';
+        colorBox.style.backgroundColor = colors[index] || '#0dcaf0';
         
         const labelText = document.createElement('span');
         labelText.textContent = label;
@@ -918,83 +1025,166 @@ function createSeverityLegend(labels) {
     });
 }
 
-// Gráfico radar - OWASP TOP 10
+// Gráfico radar - OWASP TOP 10 (CORREGIDO PARA EVITAR OVERFLOW)
 function initRadarChart() {
-    const radarCtx = document.getElementById('radarChart').getContext('2d');
+    // VERIFICAR SI EL ELEMENTO EXISTS ANTES DE OBTENER EL CONTEXTO
+    const radarElement = document.getElementById('radarChart');
+    if (!radarElement) {
+        console.log('Elemento radarChart no encontrado - puede estar oculto');
+        return; // Salir si no existe el elemento
+    }
     
+    let radarCtx;
+    try {
+        radarCtx = radarElement.getContext('2d');
+    } catch (error) {
+        console.error('Error al obtener contexto del canvas:', error);
+        return;
+    }
+    
+    // DATOS CON VALIDACIÓN MEJORADA
     const owaspData = window.dashboardData?.owaspData || {
-        labels: ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09', 'A10'],
+        labels: ['A01: Broken Access Control', 'A02: Cryptographic Failures', 'A03: Injection', 'A04: Insecure Design', 'A05: Security Misconfiguration', 'A06: Vulnerable Components', 'A07: Auth Failures', 'A08: Data Integrity', 'A09: Logging Failures', 'A10: SSRF'],
         data: [8, 6, 7, 4, 5, 3, 6, 5, 4, 3]
     };
     
-    new Chart(radarCtx, {
-        type: 'radar',
-        data: {
-            labels: owaspData.labels,
-            datasets: [{
-                label: 'OWASP TOP 10',
-                data: owaspData.data,
-                fill: true,
-                backgroundColor: 'rgba(0, 48, 89, 0.2)',
-                borderColor: '#003059',
-                borderWidth: 3,
-                pointBackgroundColor: '#FF2778',
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointHoverBackgroundColor: '#ffffff',
-                pointHoverBorderColor: '#FF2778'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                r: {
-                    angleLines: { 
-                        color: "white"
-                    },
-                    grid: { 
-                        color: "white"
-                    },
-                    pointLabels: { 
-                        color: "#ffffff",
-                        font: { 
-                            size: 12,
-                            weight: '500'
-                        }
-                    },
-                    ticks: { 
-                        color: "#ffffff",
-                        backdropColor: "transparent", 
-                        font: { size: 10 },
-                        stepSize: 1
-                    },
-                    max: 10
-                }
+    // VALIDAR QUE LOS DATOS SEAN ARRAYS
+    if (!Array.isArray(owaspData.labels) || !Array.isArray(owaspData.data)) {
+        console.error('Datos OWASP inválidos');
+        return;
+    }
+    
+    try {
+        new Chart(radarCtx, {
+            type: 'radar',
+            data: {
+                labels: owaspData.labels,
+                datasets: [{
+                    label: 'OWASP TOP 10',
+                    data: owaspData.data,
+                    fill: true,
+                    backgroundColor: 'rgba(0, 48, 89, 0.2)',
+                    borderColor: '#003059',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#FF2778',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#ffffff',
+                    pointHoverBorderColor: '#FF2778'
+                }]
             },
-            plugins: {
-                legend: {
-                    display: false
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // CAMBIO: false para mejor control
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1a1f2e',
+                        titleColor: '#ffffff',
+                        bodyColor: '#a0aec0',
+                        borderColor: '#FF2778',
+                        borderWidth: 1,
+                        callbacks: {
+                            // MEJORAR TOOLTIPS
+                            title: function(context) {
+                                return context[0].label;
+                            },
+                            label: function(context) {
+                                return `Vulnerabilidades: ${context.parsed.r}`;
+                            }
+                        }
+                    }
                 },
-                tooltip: {
-                    backgroundColor: '#1a1f2e',
-                    titleColor: '#ffffff',
-                    bodyColor: '#a0aec0',
-                    borderColor: '#FF2778',
-                    borderWidth: 1
+                scales: {
+                    r: {
+                        angleLines: { 
+                            color: "rgba(255, 255, 255, 0.3)",
+                            lineWidth: 1
+                        },
+                        grid: { 
+                            color: "rgba(255, 255, 255, 0.2)",
+                            lineWidth: 1
+                        },
+                        pointLabels: { 
+                            color: "#ffffff",
+                            font: { 
+                                size: 10, // Reducir más para evitar overflow
+                                weight: '500'
+                            },
+                            padding: 15, // Aumentar padding para evitar cortes
+                            // NUEVO: Callback para acortar etiquetas largas
+                            callback: function(label) {
+                                if (label.length > 15) {
+                                    return label.substring(0, 12) + '...';
+                                }
+                                return label;
+                            }
+                        },
+                        ticks: { 
+                            color: "#ffffff",
+                            backdropColor: "transparent", 
+                            font: { size: 9 },
+                            stepSize: 2,
+                            showLabelBackdrop: false,
+                            display: true // ASEGURAR QUE SE MUESTREN
+                        },
+                        max: Math.max(...owaspData.data) + 2, // DINÁMICO basado en datos
+                        min: 0,
+                        beginAtZero: true
+                    }
+                },
+                layout: {
+                    padding: {
+                        top: 25,    // AUMENTAR padding
+                        right: 25,
+                        bottom: 25,
+                        left: 25
+                    }
+                },
+                // NUEVO: Configuración adicional para evitar errores
+                animation: {
+                    duration: 1000
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'nearest'
                 }
             }
+        });
+        
+        console.log('Gráfico radar inicializado correctamente');
+        
+    } catch (error) {
+        console.error('Error al crear el gráfico radar:', error);
+        
+        // FALLBACK: mostrar mensaje de error en el contenedor
+        const container = radarElement.parentElement;
+        if (container) {
+            container.innerHTML = `
+                <div class="chart-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error al cargar gráfico OWASP</p>
+                </div>
+            `;
         }
-    });
+    }
 }
 
 // Gráfico de progreso (donut)
 let progressChart;
 
 function initProgressChart() {
-    const progressCtx = document.getElementById('scanProgressChart').getContext('2d');
+    const progressElement = document.getElementById('scanProgressChart');
+    if (!progressElement) {
+        console.log('Canvas scanProgressChart no encontrado, saltando inicialización');
+        return;
+    }
+    
+    const progressCtx = progressElement.getContext('2d');
     
     progressChart = new Chart(progressCtx, {
         type: 'doughnut',
@@ -1048,7 +1238,7 @@ function startProgressMonitoring() {
     setInterval(updateProgress, 30000);
 }
 
-// Actualizar progreso del scanner
+// Actualizar progreso del scanner (CORREGIDO PARA TU ENDPOINT)
 function updateProgress() {
     $.ajax({
         url: '/scan_progress',
@@ -1056,58 +1246,53 @@ function updateProgress() {
         dataType: 'json',
         timeout: 10000,
         success: function(data) {
-            if (progressChart) {
+            console.log('Datos del scanner recibidos:', data);
+            
+            // Actualizar gráfico de progreso
+            if (progressChart && data.progress !== undefined) {
                 progressChart.data.datasets[0].data = [data.progress, 100 - data.progress];
                 progressChart.update('none');
             }
             
+            // Actualizar información del scanner
             updateScannerInfo(data);
             updateMetrics(data);
             
-            if (data.progress === 100 && data.justCompleted) {
+            // Si se completó un escaneo, actualizar alertas
+            if (data.justCompleted) {
                 showToast('¡Escaneo completado exitosamente!', 'success');
                 setTimeout(loadLastScanAlerts, 2000);
             }
         },
         error: function(xhr, status, error) {
-            console.error('Error al obtener progreso:', error);
+            console.error('Error al obtener progreso del scanner:', error);
             
-            // Usar datos de ejemplo si el endpoint no existe
-            if (xhr.status === 404) {
-                const exampleData = {
-                    progress: 75,
-                    ultimoScanner: "Escaneo de ejemplo.com",
-                    proximo: "Escaneo programado",
-                    fecha: "Mañana 14:00",
-                    activeScans: 1,
-                    scheduledScans: 3
-                };
-                
-                if (progressChart) {
-                    progressChart.data.datasets[0].data = [exampleData.progress, 100 - exampleData.progress];
-                    progressChart.update('none');
-                }
-                
-                updateScannerInfo(exampleData);
-                updateMetrics(exampleData);
-                return;
-            }
-            
+            // En caso de error, mostrar información de error
             updateScannerStatus('error');
+            updateMetrics({ activeScans: 0, scheduledScans: 0 });
         }
     });
 }
 
-// Actualizar información del scanner
+// Actualizar información del scanner (CORREGIDO)
 function updateScannerInfo(data) {
     const ultimoElement = document.getElementById('ultimoScanner');
     const proximoElement = document.getElementById('proximoScanner');
     const fechaElement = document.getElementById('proximoScannerFecha');
     
-    if (ultimoElement) ultimoElement.textContent = data.ultimoScanner || 'Sin escaneos recientes';
-    if (proximoElement) proximoElement.textContent = data.proximo || 'No programado';
-    if (fechaElement) fechaElement.textContent = data.fecha || '';
+    if (ultimoElement) {
+        ultimoElement.textContent = data.ultimoScanner || 'Sin escaneos recientes';
+    }
     
+    if (proximoElement) {
+        proximoElement.textContent = data.proximo || 'No programado';
+    }
+    
+    if (fechaElement) {
+        fechaElement.textContent = data.fecha || '';
+    }
+    
+    // Actualizar estado del scanner basado en el progreso
     const statusElement = document.getElementById('scannerStatus');
     if (!statusElement) return;
     
@@ -1119,13 +1304,16 @@ function updateScannerInfo(data) {
     if (data.progress > 0 && data.progress < 100) {
         indicator.className = 'status-indicator active';
         statusText.textContent = 'Escaneando';
+    } else if (data.progress === 100) {
+        indicator.className = 'status-indicator';
+        statusText.textContent = 'Completado';
     } else {
         indicator.className = 'status-indicator';
         statusText.textContent = 'En espera';
     }
 }
 
-// Actualizar métricas
+// Actualizar métricas (CORREGIDO)
 function updateMetrics(data) {
     const activeScanElement = document.getElementById('activeScans');
     const scheduledScanElement = document.getElementById('scheduledScans');

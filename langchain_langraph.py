@@ -13,11 +13,19 @@ from extensions import *
 import threading
 from models import Escaneo_programados
 from google import genai
+import logging
 from sqlalchemy import text
 from langchain_core.messages.tool import ToolMessage
 from scanner import connect_to_zap, add_url_to_sites, perform_scan, send_email
 # Cargar la clave API desde .env
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[ logging.StreamHandler(),logging.FileHandler("zap_logs.log", mode="w", encoding="utf-8")]
+)
+
 api_key = os.getenv("GEMINI_API_KEY")
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
 
@@ -29,9 +37,9 @@ class State(TypedDict):
 """Inicializa el gráfico de estado basado en la clase State y será la base para conectar nodos."""
 graph_builder = StateGraph(State) # actua como cadena de monataje que partiendo del state inicial añade nuevos inputs y llama a funciones correspondientes
 
-def comparar_reportes(user_input, report_str):
+def resumir_reporte(user_input, report_str):
     prompt_text = f"""
-        Eres un asistente especializado ciberseguridad y vulnerabilidades. Te van a pasar uno  o dos reportes. Tendras que valorarlo en base a la pregunta del usuario.
+        Eres un asistente especializado ciberseguridad y vulnerabilidades. Te van a pasar un reporte. Tendras que valorarlo en base a la pregunta del usuario.
         En caso de que te digan resumen sera un solo reporte y en caso de que te pidan comparacion pues se te pasará mas de un reporte.
         El formate de salida siene que ser no demasido largo. No tendras que incluir las vulnerabilidades informativas y podras especificar que alertas crees que son falsos positivos en base a tus conocimeinto.
         Tendras que incluir el resumen, los falsos positivos si los hay y recomendaciones. El formato de salida será en formato markdown.
@@ -39,15 +47,16 @@ def comparar_reportes(user_input, report_str):
         reportes: {report_str}
         """
         
-
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model="gemini-2.0-flash", contents=prompt_text
+        model="gemini-2.5-flash", contents=prompt_text
     )
 
     result = response.text.strip()  
     resumen = str(result)
+    logging.info(f"Resumen generado: {resumen}")
     return resumen
+
 # Funciones para herramientas decoradas con @tool
 @tool
 def vulnerabilidades(user_input: str) -> str:
@@ -93,7 +102,6 @@ def vulnerabilidades(user_input: str) -> str:
     result = str(result)
 
     return result
-    
 
 @tool
 def consultar_escaneres_programados(input: str) -> str:
@@ -144,21 +152,20 @@ def consultar_escaneres_programados(input: str) -> str:
     return result
 
 @tool
-def resumenes_comparacion(user_input: str) -> str:
+def resumenen(user_input: str) -> str:
     """
-    resume o compara los reportes de una URL según la pregunta del usuario
+    resume el reporte de una URL dada
     Args:
-        text (str): La pregunta proporcionada por el usuario sobre comparacion o resumenes de reportes.
+        text (str): La pregunta proporcionada por el usuario sobre el resumene de un reporte.
 
     Returns:
         str: Los resultados del resumen o la comparacion entre reportes.
     """
     
-    
     prompt_text = f"""
         Eres un asistente especializado en consultas SQL. Te voy a pasar un ejemplo de como tiene que ser la consulta y la estructura de mi tabla y vas a tener que responder con el formato string solo la consulta sin COMILLAS. 
         Ejemplo:   
-            SELECT report_file FROM reportes_vulnerabilidades_url WHERE target_url='https://example.com/' ORDER BY fecha_scan DESC LIMIT 1
+            SELECT report_file FROM reportes_vulnerabilidades_url WHERE target_url='' ORDER BY fecha_scan DESC LIMIT 1
         Estrcutura tabla:
             target_url 
             report_file = db.Column(JSON, nullable=True)
@@ -166,21 +173,18 @@ def resumenes_comparacion(user_input: str) -> str:
         La pregunta proporcionada por el usuario es: {user_input}
         """
     
-
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model="gemini-2.0-flash", contents=prompt_text
+        model="gemini-2.5-flash", contents=prompt_text
     )
 
     query = response.text.strip()  
-    print(f"Consulta generada: {query}")
+    logging.info(f"Consulta generada: {query}")
     result = db.session.execute(text(query)).fetchall()
     result = str(result)
-    resumen = comparar_reportes(user_input, result)
+    logging.info(f"Reporte en string: {result}")
+    resumen = resumir_reporte(user_input, result)
     return resumen
-
-
-
 
 @tool
 def consultar_escaneres_ejecutandose(input: str) -> str:
@@ -200,7 +204,7 @@ def consultar_escaneres_ejecutandose(input: str) -> str:
     prompt_text = f"""
     Eres un asistente especializado en consultas SQL. Te voy a pasar los atributos del modelo de la tabla y vas a tener que responder con el formato string solo la consulta sin COMILLAS. 
     El día de hoy es: {date}.
-    Para poder filtrar por fecha debes hacer la consulta con el mismo formato de fecha '%Y-%m-%d%', además tendrás que ver si el estado está pendiente o no.
+    Para poder filtrar por fecha debes hacer la consulta con el mismo formato de fecha '%Y-%m-%d%', además tendrás que ver si el estado está pendiente or no.
     Ten en cuenta que la fecha aparece con dia y hora si no te dicen hora tendras que sacar todos los escaneres programados para ese dia.
     class Escaneres_completados(db.Model):
     __tablename__ = 'escaneos_completados'  
@@ -230,7 +234,6 @@ def consultar_escaneres_ejecutandose(input: str) -> str:
     result = str(result)
         
     return result
-
 
 def ejecutar_scan_en_thread(url, intensity, email):
     """Función que se ejecutará en un hilo separado."""
@@ -312,10 +315,8 @@ def ejecutar_escaner(user_input: str) -> str:
         thread.start()
         return "Escaneo ejecutado correctamente. Serás notificado por email cuando termine el escaneo."
 
-
-
 # Lista de herramientas disponibles
-tools = [vulnerabilidades, consultar_escaneres_programados, resumenes_comparacion, consultar_escaneres_ejecutandose, ejecutar_escaner]
+tools = [vulnerabilidades, consultar_escaneres_programados, resumenen, consultar_escaneres_ejecutandose, ejecutar_escaner]
 
 # Vincular las herramientas al modelo Gemini
 llm_with_tools = llm.bind_tools(tools)
@@ -325,26 +326,12 @@ y devolver una respuesta utilizando el modelo de lenguaje."""
 def chatbot(state: State):
     return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
-def tool_redirect_condition(state: State):
-    """Si la tool ejecutada es 'resumenes', va directo al usuario sin pasar por el chatbot."""
-    last_message = state["messages"][-1]
-
-    if isinstance(last_message, ToolMessage) and last_message.name == "resumenes_comparacion":
-        return "output"  # Salida directa al usuario
-    return "chatbot" 
-
 # Añadir nodos al gráfico
 graph_builder.add_node("chatbot", chatbot)
 
 # Crear un nodo para las herramientas
 tools_node = ToolNode(tools=tools)
 graph_builder.add_node("tools", tools_node)
-
-def output_direct(state: State):
-    """Este nodo simplemente devuelve el mensaje generado por la tool sin modificarlo."""
-    return state["messages"][-1]
-
-graph_builder.add_node("output", output_direct)
 
 """Define una conexión condicional entre el nodo chatbot y las herramientas.
 tools_condition es una condición predefinida que verifica si debe usar las tools o no 
@@ -354,12 +341,10 @@ graph_builder.add_conditional_edges(
     tools_condition,
 )
 
-graph_builder.add_conditional_edges(
-   "tools",
-    tool_redirect_condition,
-)
-"""Esto especifica que si pasa por tools tiene que volver a chatbot y que empieza por chatbot."""
-#graph_builder.add_edge("output", "chatbot")
+"""Todas las herramientas vuelven al chatbot después de ejecutarse"""
+graph_builder.add_edge("tools", "chatbot")
+
+"""El flujo empieza por chatbot"""
 graph_builder.add_edge(START, "chatbot")
 
 """Añadimos memoria para tener continuidad en la conversación.
@@ -371,5 +356,3 @@ graph_memory = graph_builder.compile(checkpointer=memory) #checkpoint es el comp
 """Ahora corremos el código.
 Definimos el diccionario configuración en que decimos que queremos tener un único hilo de conversación."""
 config = {"configurable": {"thread_id": "1"}}
-
-

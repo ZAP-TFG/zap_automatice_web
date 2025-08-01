@@ -335,7 +335,7 @@ def perform_scan(zap, url, strength):
         db.session.commit()
 
         extract_vulnerabilities(zap, url, scan.fecha_fin)
-        generar_reporte_custom_tabla_url(zap, url)
+        #generar_reporte_custom_tabla_url(zap, url)
         return scan_id
 
     except Exception as error:

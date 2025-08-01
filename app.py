@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify,  redirect, url_for, session, flash,  send_from_directory, current_app
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, timedelta
 from extensions import db, app
 from flask_migrate import Migrate
 from scanner import connect_to_zap, add_url_to_sites, perform_scan, send_email, perform_plan_automation
@@ -500,21 +500,115 @@ def descargar_reporte(filename):
 
 @app.route('/scan_progress', methods=['GET'])
 @login_required
-def progreso():
+def scan_progress():
+    """
+    Devuelve el progreso del último escaneo y métricas globales.
+    Ahora incluye:
+        • scan_id    → id del escaneo que está en curso (si hay)
+        • urlActiva  → URL de ese escaneo activo
+    """
     try:
-        # Obtener el escaneo más reciente que esté en proceso
-        scan = Escaneres_completados.query.order_by(Escaneres_completados.fecha_inicio.desc()).first()
-        ultimo_escaner = scan.target_url
-        proximo = Escaneo_programados.query.filter_by(estado="PENDIENTE").order_by(Escaneo_programados.fecha_programada.asc()).first()
+        # Último escaneo (terminado o no)
+        scan = Escaneres_completados.query \
+               .order_by(Escaneres_completados.fecha_inicio.desc()) \
+               .first()
+
+        ultimo_escaner  = scan.target_url if scan else "No hay escaneos recientes"
+        progreso_actual = scan.progreso    if scan else 0
+
+        # Escaneo ACTIVO (progreso < 100)
+        scan_activo = Escaneres_completados.query \
+                      .filter(Escaneres_completados.progreso < 100) \
+                      .order_by(Escaneres_completados.fecha_inicio.desc()) \
+                      .first()
+
+        url_activa     = scan_activo.target_url if scan_activo else ""
+        active_scan_id = scan_activo.id         if scan_activo else None
+
+        # Próximo escaneo programado
+        proximo = Escaneo_programados.query \
+                  .filter_by(estado="PENDIENTE") \
+                  .order_by(Escaneo_programados.fecha_programada.asc()) \
+                  .first()
+
         proximo_escaner = proximo.target_url if proximo else "No hay escaneos programados"
-        proximo_fecha = proximo.fecha_programada.isoformat() if proximo else None
-        if scan or proximo:
-            return jsonify({'progress': scan.progreso,'ultimoScanner': ultimo_escaner, 'proximo': proximo_escaner, 'fecha': proximo_fecha})
-        else:
-            return jsonify({'progress': 0, 'ultimoScanner': ultimo_escaner, 'proximo': proximo_escaner, 'fecha': proximo_fecha})
-    except Exception as e:
-        logging.error(f"Error obteniendo el progreso del escaneo: {e}")
-        return jsonify({'progress': 0, 'ultimoScanner': "No hay Ultimo Escaner", 'proximo': "No hay Próximo Escaner", 'fecha': 'No hay Fecha'})
+        proximo_fecha   = proximo.fecha_programada.strftime('%d/%m/%Y %H:%M') if proximo else "Sin fecha programada"
+
+        # Métricas
+        hace_24_h = datetime.now() - timedelta(hours=24)
+        escaneos_activos = Escaneres_completados.query \
+                           .filter(Escaneres_completados.progreso < 100,
+                                   Escaneres_completados.fecha_inicio >= hace_24_h) \
+                           .count()
+
+        ahora          = datetime.now()
+        en_7_dias      = ahora + timedelta(days=7)
+        escaneos_prog  = Escaneo_programados.query \
+                         .filter(Escaneo_programados.estado == "PENDIENTE",
+                                 Escaneo_programados.fecha_programada >= ahora,
+                                 Escaneo_programados.fecha_programada <= en_7_dias) \
+                         .count()
+
+        return jsonify({
+            'progress'       : progreso_actual,
+            'scan_id'        : active_scan_id,
+            'urlActiva'      : url_activa,
+            'ultimoScanner'  : ultimo_escaner,
+            'proximo'        : proximo_escaner,
+            'fecha'          : proximo_fecha,
+            'activeScans'    : escaneos_activos,
+            'scheduledScans' : escaneos_prog,
+            'justCompleted'  : False          # úsalo si más adelante detectas “completado”
+        })
+
+    except Exception as exc:
+        logging.error("scan_progress error: %s", exc, exc_info=True)
+        return jsonify({
+            'progress'       : 0,
+            'scan_id'        : None,
+            'urlActiva'      : "",
+            'ultimoScanner'  : "Error",
+            'proximo'        : "Error",
+            'fecha'          : "Error",
+            'activeScans'    : 0,
+            'scheduledScans' : 0,
+            'justCompleted'  : False
+        }), 500
+
+
+# ───────────────────────────  /stop_scan  ──────────────────────────────
+@app.route('/stop_scan', methods=['POST'])
+@login_required
+def stop_scan():
+    """
+    Marca un escaneo en curso como DETENIDO.
+    No se depende de Celery; simplemente actualizamos la fila en BD.
+    El proceso real de escaneo deberá leer este estado (si procede) y abortarse.
+    """
+    try:
+        data = request.get_json() or {}
+        scan_id = data.get('scan_id')
+
+        if not scan_id:
+            return jsonify({'error': 'scan_id requerido'}), 400
+
+        scan = Escaneres_completados.query.get(scan_id)
+        if not scan:
+            return jsonify({'error': 'Escaneo no encontrado'}), 404
+
+        # --- aquí decides qué campos tocar para “parar” el escaneo ---
+        scan.progreso = 0
+        # Si tienes un campo estado / status, cámbialo:
+        if hasattr(scan, 'estado'):
+            scan.estado = 'DETENIDO'      # o 'CANCELADO', lo que uses en tu modelo
+
+        db.session.commit()
+        return jsonify({'stopped': True})
+
+    except Exception as exc:
+        logging.error("stop_scan error: %s", exc, exc_info=True)
+        return jsonify({'error': 'Error interno'}), 500
+
 
 @app.route('/last_scan_alerts', methods=['GET'])
 @login_required
@@ -642,13 +736,9 @@ def last_scan_alerts():
             'alerts': []
         }), 500
 
-
 @app.route('/search_alerts', methods=['POST'])
 @login_required
 def search_alerts():
-    """
-    Busca alertas por URL específica (JSON de ZAP).
-    """
     try:
         data = request.get_json()
         url = data.get('url', '').strip()
@@ -658,11 +748,9 @@ def search_alerts():
         if not url:
             return jsonify({'error': 'URL requerida'}), 400
         
-        # Construir consulta base
         query = Reportes_vulnerabilidades_url.query
         query = query.filter(Reportes_vulnerabilidades_url.target_url.ilike(f'%{url}%'))
         
-        # Filtrar por fecha si se especifica
         if days:
             try:
                 days_int = int(days)
@@ -688,13 +776,10 @@ def search_alerts():
             if not site_data or 'alerts' not in site_data:
                 continue
             
-            # Contar alertas por severidad
             alerts_by_severity = {'high': 0, 'medium': 0, 'low': 0, 'info': 0}
             
             for alert in site_data['alerts']:
                 riskdesc = alert.get('riskdesc', 'Informational')
-                
-                # CORRECCIÓN: Solo leer la parte antes de los paréntesis
                 riskdesc_clean = riskdesc.split('(')[0].strip()
                 
                 if 'Alto' in riskdesc_clean or 'High' in riskdesc_clean:
@@ -706,20 +791,22 @@ def search_alerts():
                 else:
                     alerts_by_severity['info'] += 1
             
-            # Aplicar filtro de severidad si se especifica
             if severity:
-                severity_map = {'high': 'high', 'medium': 'medium', 'low': 'low', 'info': 'info'}
                 total_alerts = alerts_by_severity.get(severity, 0)
             else:
                 total_alerts = sum(alerts_by_severity.values())
             
             if total_alerts > 0:
+                # CAMBIO: Incluir fecha formateada y scan_id único
                 results.append({
                     'url': escaneo.target_url,
                     'scan_date': escaneo.fecha_scan.isoformat(),
+                    'scan_date_formatted': escaneo.fecha_scan.strftime('%d/%m/%Y %H:%M'),
                     'total_alerts': total_alerts,
                     'alerts_by_severity': alerts_by_severity,
-                    'scan_id': escaneo.id
+                    'scan_id': escaneo.id,
+                    # NUEVO: Identificador único para cada resultado
+                    'unique_key': f"{escaneo.id}_{escaneo.target_url}"
                 })
         
         return jsonify({'results': results})
@@ -727,6 +814,7 @@ def search_alerts():
     except Exception as e:
         logging.error(f"Error en búsqueda de alertas: {e}")
         return jsonify({'error': 'Error al realizar la búsqueda'}), 500
+
 
 
 @app.route('/urls_disponibles', methods=['GET'])
@@ -750,26 +838,33 @@ def urls_disponibles():
 @app.route('/alert_details_by_severity', methods=['POST'])
 @login_required
 def alert_details_by_severity():
-    """
-    Obtiene detalles específicos de alertas por severidad y URL.
-    """
     try:
         data = request.get_json()
         url = data.get('url', '')
         severity = data.get('severity', '')
+        scan_id = data.get('scan_id', '')  # NUEVO: recibir scan_id específico
         
         if not url or not severity:
             return jsonify({'error': 'URL y severidad requeridas'}), 400
         
-        # Buscar escaneos para esta URL
-        escaneos = Reportes_vulnerabilidades_url.query.filter(
-            Reportes_vulnerabilidades_url.target_url.ilike(f'%{url}%')
-        ).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).all()
+        # CAMBIO: Si hay scan_id, usar solo ese escaneo
+        if scan_id:
+            try:
+                escaneo = Reportes_vulnerabilidades_url.query.get(int(scan_id))
+                if not escaneo:
+                    return jsonify({'alerts': []})
+                escaneos = [escaneo]
+            except ValueError:
+                return jsonify({'error': 'ID de escaneo inválido'}), 400
+        else:
+            # Si no hay scan_id, usar el más reciente (comportamiento anterior)
+            escaneos = Reportes_vulnerabilidades_url.query.filter(
+                Reportes_vulnerabilidades_url.target_url.ilike(f'%{url}%')
+            ).order_by(Reportes_vulnerabilidades_url.fecha_scan.desc()).limit(1).all()
         
         if not escaneos:
             return jsonify({'alerts': []})
         
-        # Tomar el primer escaneo (más reciente)
         escaneo = escaneos[0]
         
         if not escaneo.report_file or 'site' not in escaneo.report_file:
@@ -781,16 +876,12 @@ def alert_details_by_severity():
         if not site_data or 'alerts' not in site_data:
             return jsonify({'alerts': []})
         
-        # Filtrar alertas por severidad
         detailed_alerts = []
         
         for alert in site_data['alerts']:
             riskdesc = alert.get('riskdesc', 'Informational')
-            
-            # CORRECCIÓN: Solo leer la parte antes de los paréntesis
             riskdesc_clean = riskdesc.split('(')[0].strip()
             
-            # Determinar severidad
             if 'Alto' in riskdesc_clean or 'High' in riskdesc_clean:
                 alert_severity = 'high'
             elif 'Medio' in riskdesc_clean or 'Medium' in riskdesc_clean:
@@ -800,9 +891,7 @@ def alert_details_by_severity():
             else:
                 alert_severity = 'informational'
             
-            # Solo incluir alertas que coincidan con la severidad solicitada
             if alert_severity == severity:
-                # Extraer evidencia y ataque de las instancias
                 evidence = ""
                 attack = ""
                 instances = alert.get('instances', [])
@@ -828,12 +917,15 @@ def alert_details_by_severity():
             'alerts': detailed_alerts,
             'url': url,
             'severity': severity,
+            'scan_date': escaneo.fecha_scan.strftime('%d/%m/%Y %H:%M'),
+            'scan_id': escaneo.id,
             'total': len(detailed_alerts)
         })
         
     except Exception as e:
         logging.error(f"Error al obtener detalles por severidad: {e}")
         return jsonify({'error': 'Error al obtener detalles'}), 500
+
 
     
 init_scheduler_scans()
